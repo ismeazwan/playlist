@@ -3,41 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aplikasi Playlist Lagu</title>
-    <!-- Memuat Tailwind CSS untuk styling -->
+    <title>Aplikasi Playlist MP3</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Memuat Font Awesome untuk ikon -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
-        /* Style kustom untuk tampilan yang lebih baik */
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        .playlist-item:hover .delete-btn {
-            opacity: 1;
-        }
-        .delete-btn {
-            opacity: 0;
-            transition: opacity 0.2s ease-in-out;
-        }
+        body { font-family: 'Inter', sans-serif; }
+        .playlist-item:hover .delete-btn { opacity: 1; }
+        .delete-btn { opacity: 0; transition: opacity 0.2s ease-in-out; }
+        /* Style untuk progress bar */
+        .progress-bar-container { background-color: #4a5568; }
+        .progress-bar { background-color: #4fd1c5; transition: width 0.1s linear; }
     </style>
 </head>
 <body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
 
+    <!-- Elemen Audio Player yang tersembunyi -->
+    <audio id="audioPlayer"></audio>
+
     <div class="bg-gray-800 rounded-2xl shadow-2xl p-6 w-full max-w-lg">
         
-        <!-- Header Aplikasi -->
         <div class="text-center mb-6">
-            <h1 class="text-3xl font-bold text-cyan-400">Playlist Laguku</h1>
-            <p class="text-gray-400 mt-1">Dibuat dengan Konsep Linked List</p>
-        </div>
-
-        <!-- Form Tambah Lagu -->
-        <div class="flex gap-2 mb-4">
-            <input type="text" id="songInput" class="w-full bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500" placeholder="Masukkan judul lagu...">
-            <button id="addBtn" class="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300">
-                <i class="fas fa-plus"></i>
-            </button>
+            <h1 class="text-3xl font-bold text-cyan-400">MP3 Player</h1>
+            <p class="text-gray-400 mt-1">Dibuat dengan Doubly Linked List</p>
         </div>
 
         <!-- Kontrol Player -->
@@ -45,6 +32,14 @@
             <div class="text-center mb-3">
                 <p class="text-sm text-gray-400">SEDANG DIPUTAR</p>
                 <h2 id="nowPlaying" class="text-xl font-semibold truncate h-7">Pilih lagu untuk diputar</h2>
+            </div>
+            <!-- Progress Bar dan Waktu -->
+            <div class="flex items-center gap-3 text-xs text-gray-400 mb-3">
+                <span id="currentTime">0:00</span>
+                <div class="w-full progress-bar-container rounded-full h-1.5">
+                    <div id="progressBar" class="progress-bar h-1.5 rounded-full" style="width: 0%"></div>
+                </div>
+                <span id="totalDuration">0:00</span>
             </div>
             <div class="flex justify-center items-center gap-6">
                 <button id="prevBtn" class="text-gray-400 hover:text-white text-2xl transition-colors"><i class="fas fa-backward-step"></i></button>
@@ -63,10 +58,10 @@
 
         <!-- Fitur Import -->
         <div class="mt-4 text-center">
-            <label for="importFile" class="cursor-pointer bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300 inline-block">
-                <i class="fas fa-upload mr-2"></i> Import dari File (.txt)
+            <label for="importFile" class="cursor-pointer bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300 inline-block">
+                <i class="fas fa-music mr-2"></i> Pilih File MP3
             </label>
-            <input type="file" id="importFile" class="hidden" accept=".txt">
+            <input type="file" id="importFile" class="hidden" accept=".mp3" multiple>
              <p id="importStatus" class="text-sm text-gray-500 mt-2"></p>
         </div>
 
@@ -74,11 +69,12 @@
 
     <script>
         // --- Implementasi Doubly Linked List ---
+        // Node now stores an object with title and URL
         class Node {
             constructor(data) {
-                this.data = data; // data = judul lagu
-                this.next = null; // pointer ke lagu berikutnya
-                this.prev = null; // pointer ke lagu sebelumnya
+                this.data = data; // data = { title: "...", url: "..." }
+                this.next = null;
+                this.prev = null;
             }
         }
 
@@ -87,11 +83,9 @@
                 this.head = null;
                 this.tail = null;
                 this.length = 0;
-                this.currentNode = null; // Node yang sedang diputar
-                this.isPlaying = false;
+                this.currentNode = null;
             }
 
-            // Menambah lagu di akhir playlist
             add(data) {
                 const newNode = new Node(data);
                 if (this.length === 0) {
@@ -105,74 +99,41 @@
                 this.length++;
             }
 
-            // Menghapus lagu berdasarkan data (judul)
-            remove(data) {
+            remove(url) { // Remove by URL as it's unique
                 if (!this.head) return;
 
                 let currentNode = this.head;
                 while(currentNode) {
-                    if (currentNode.data === data) {
-                        // Jika yang dihapus adalah node yang sedang diputar
+                    if (currentNode.data.url === url) {
                         if (this.currentNode === currentNode) {
-                             // Jika ada lagu selanjutnya, putar itu. Jika tidak, putar lagu sebelumnya.
                             if(currentNode.next) this.currentNode = currentNode.next;
                             else if (currentNode.prev) this.currentNode = currentNode.prev;
-                            else this.currentNode = null; // Playlist jadi kosong
+                            else this.currentNode = null;
                         }
                         
-                        if (currentNode.prev) {
-                            currentNode.prev.next = currentNode.next;
-                        } else {
-                            this.head = currentNode.next;
-                        }
+                        if (currentNode.prev) currentNode.prev.next = currentNode.next;
+                        else this.head = currentNode.next;
 
-                        if (currentNode.next) {
-                            currentNode.next.prev = currentNode.prev;
-                        } else {
-                            this.tail = currentNode.prev;
-                        }
+                        if (currentNode.next) currentNode.next.prev = currentNode.prev;
+                        else this.tail = currentNode.prev;
                         
+                        // Revoke the Object URL to free up memory
+                        URL.revokeObjectURL(currentNode.data.url);
                         this.length--;
-                        return true; // Berhasil dihapus
+                        return true;
                     }
                     currentNode = currentNode.next;
                 }
-                return false; // Lagu tidak ditemukan
-            }
-
-            // Memulai atau menjeda pemutaran
-            togglePlay() {
-                if (this.length === 0) return;
-                
-                if (!this.currentNode) {
-                    this.currentNode = this.head; // Mulai dari awal jika belum ada yg diputar
-                }
-                
-                this.isPlaying = !this.isPlaying;
-            }
-            
-            // Pindah ke lagu berikutnya
-            next() {
-                if (!this.currentNode || !this.currentNode.next) return;
-                this.currentNode = this.currentNode.next;
-                this.isPlaying = true; // Langsung putar lagu berikutnya
-            }
-            
-            // Pindah ke lagu sebelumnya
-            prev() {
-                if (!this.currentNode || !this.currentNode.prev) return;
-                this.currentNode = this.currentNode.prev;
-                this.isPlaying = true; // Langsung putar lagu sebelumnya
+                return false;
             }
         }
         
         // --- Logika Aplikasi ---
         document.addEventListener('DOMContentLoaded', () => {
             const playlist = new DoublyLinkedList();
-
-            // Referensi Elemen DOM
-            const songInput = document.getElementById('songInput');
-            const addBtn = document.getElementById('addBtn');
+            
+            // DOM Elements
+            const audioPlayer = document.getElementById('audioPlayer');
             const playlistContainer = document.getElementById('playlistContainer');
             const emptyMessage = document.getElementById('emptyMessage');
             const nowPlaying = document.getElementById('nowPlaying');
@@ -182,115 +143,116 @@
             const nextBtn = document.getElementById('nextBtn');
             const importFile = document.getElementById('importFile');
             const importStatus = document.getElementById('importStatus');
+            const currentTimeEl = document.getElementById('currentTime');
+            const totalDurationEl = document.getElementById('totalDuration');
+            const progressBar = document.getElementById('progressBar');
 
-            // Fungsi untuk me-render ulang tampilan playlist
+            function formatTime(seconds) {
+                const minutes = Math.floor(seconds / 60);
+                const secs = Math.floor(seconds % 60);
+                return `${minutes}:${secs < 10 ? '0' : ''}${secs}`;
+            }
+
+            function playSong(node) {
+                if (!node) {
+                    audioPlayer.pause();
+                    nowPlaying.textContent = "Playlist Selesai";
+                    playIcon.className = 'fas fa-play';
+                    return;
+                }
+                playlist.currentNode = node;
+                audioPlayer.src = node.data.url;
+                audioPlayer.play();
+                nowPlaying.textContent = node.data.title;
+                playIcon.className = 'fas fa-pause';
+                renderPlaylist(); // To highlight the current song
+            }
+
             function renderPlaylist() {
                 playlistContainer.innerHTML = '';
                 if (playlist.length === 0) {
                     playlistContainer.appendChild(emptyMessage);
                     emptyMessage.style.display = 'block';
-                    nowPlaying.textContent = 'Playlist kosong';
+                    nowPlaying.textContent = 'Pilih lagu untuk diputar';
                     return;
                 }
                 
                 emptyMessage.style.display = 'none';
                 let currentNode = playlist.head;
-                let index = 0;
                 while(currentNode) {
                     const item = document.createElement('div');
-                    item.className = 'playlist-item flex items-center justify-between p-3 border-b border-gray-600 hover:bg-gray-600 transition-colors cursor-pointer';
-                    item.dataset.songData = currentNode.data;
+                    const isActive = playlist.currentNode === currentNode;
+                    item.className = `playlist-item flex items-center justify-between p-3 border-b border-gray-600 hover:bg-gray-600 transition-colors cursor-pointer ${isActive ? 'bg-cyan-800' : ''}`;
+                    item.dataset.songUrl = currentNode.data.url;
 
-                    const titleDiv = document.createElement('div');
-                    titleDiv.className = 'flex items-center gap-4';
+                    const title = document.createElement('span');
+                    title.className = 'text-white truncate';
+                    title.textContent = currentNode.data.title;
                     
-                    const songNumber = document.createElement('span');
-                    songNumber.className = 'text-gray-400 w-5';
-                    songNumber.textContent = `${index + 1}.`;
-
-                    const songTitle = document.createElement('span');
-                    songTitle.className = 'text-white';
-                    songTitle.textContent = currentNode.data;
-
-                    titleDiv.appendChild(songNumber);
-                    titleDiv.appendChild(songTitle);
-
                     const deleteButton = document.createElement('button');
-                    deleteButton.className = 'delete-btn text-red-500 hover:text-red-400 text-lg';
+    þ                deleteButton.className = 'delete-btn text-red-500 hover:text-red-400 text-lg flex-shrink-0 ml-4';
                     deleteButton.innerHTML = '<i class="fas fa-trash-alt"></i>';
-                    deleteButton.dataset.songData = currentNode.data;
+                    deleteButton.dataset.songUrl = currentNode.data.url;
                     
-                    item.appendChild(titleDiv);
+                    item.appendChild(title);
                     item.appendChild(deleteButton);
                     playlistContainer.appendChild(item);
                     
                     currentNode = currentNode.next;
-                    index++;
-                }
-                updatePlayerUI();
-            }
-            
-            // Fungsi untuk update UI Player
-            function updatePlayerUI() {
-                if (playlist.currentNode) {
-                    nowPlaying.textContent = playlist.currentNode.data;
-                } else if(playlist.length > 0) {
-                    nowPlaying.textContent = 'Tekan play untuk memulai';
-                } else {
-                    nowPlaying.textContent = 'Playlist kosong';
-                }
-                
-                if (playlist.isPlaying) {
-                    playIcon.classList.remove('fa-play');
-                    playIcon.classList.add('fa-pause');
-                } else {
-                    playIcon.classList.remove('fa-pause');
-                    playIcon.classList.add('fa-play');
                 }
             }
 
-            // Event Listener untuk menambah lagu
-            function handleAddSong() {
-                 const songTitle = songInput.value.trim();
-                if (songTitle) {
-                    playlist.add(songTitle);
-                    songInput.value = '';
-                    renderPlaylist();
-                }
-            }
+            // --- Event Listeners ---
             
-            addBtn.addEventListener('click', handleAddSong);
-            songInput.addEventListener('keypress', (e) => {
-                if(e.key === 'Enter') {
-                    handleAddSong();
+            // Player Controls
+            playBtn.addEventListener('click', () => {
+                if (playlist.length === 0) return;
+                
+                if (audioPlayer.paused) {
+                    if (!playlist.currentNode) {
+                        playSong(playlist.head);
+                    } else {
+                        audioPlayer.play();
+                    }
+                } else {
+                    audioPlayer.pause();
                 }
             });
 
-            // Event Listener untuk hapus dan putar lagu dari list
+            nextBtn.addEventListener('click', () => {
+                if (playlist.currentNode && playlist.currentNode.next) {
+                    playSong(playlist.currentNode.next);
+                }
+            });
+
+            prevBtn.addEventListener('click', () => {
+                if (playlist.currentNode && playlist.currentNode.prev) {
+                    playSong(playlist.currentNode.prev);
+                }
+            });
+
+            // Playlist item click
             playlistContainer.addEventListener('click', (e) => {
                 const target = e.target;
                 
-                // Logika Hapus Lagu
                 const deleteButton = target.closest('.delete-btn');
-                if(deleteButton) {
-                    const songData = deleteButton.dataset.songData;
-                    if(playlist.remove(songData)) {
-                        renderPlaylist(); // Render ulang setelah menghapus
-                        updatePlayerUI();
+                if (deleteButton) {
+                    const songUrl = deleteButton.dataset.songUrl;
+                    playlist.remove(songUrl);
+                    if (playlist.currentNode && playlist.currentNode.data.url === songUrl) {
+                        playSong(playlist.currentNode); // Play the next/prev song
                     }
-                    return; // Hentikan eksekusi lebih lanjut
+                    renderPlaylist();
+                    return;
                 }
                 
-                // Logika Memutar Lagu Saat di-klik
                 const playlistItem = target.closest('.playlist-item');
-                if(playlistItem) {
-                    const songData = playlistItem.dataset.songData;
+                if (playlistItem) {
+                    const songUrl = playlistItem.dataset.songUrl;
                     let nodeToPlay = playlist.head;
                     while(nodeToPlay) {
-                        if (nodeToPlay.data === songData) {
-                            playlist.currentNode = nodeToPlay;
-                            playlist.isPlaying = true;
-                            updatePlayerUI();
+                        if (nodeToPlay.data.url === songUrl) {
+                            playSong(nodeToPlay);
                             break;
                         }
                         nodeToPlay = nodeToPlay.next;
@@ -298,55 +260,57 @@
                 }
             });
 
-            // Event Listener untuk kontrol player
-            playBtn.addEventListener('click', () => {
-                playlist.togglePlay();
-                updatePlayerUI();
-            });
+            // File Import
+            importFile.addEventListener('change', (event) => {
+                const files = event.target.files;
+                if (!files.length) return;
 
-            nextBtn.addEventListener('click', () => {
-                playlist.next();
-                updatePlayerUI();
-            });
+                let importedCount = 0;
+                for (const file of files) {
+                    if (file.type === "audio/mpeg") {
+                        const songData = {
+                            title: file.name.replace('.mp3', ''),
+                            url: URL.createObjectURL(file)
+                        };
+                        playlist.add(songData);
+                        importedCount++;
+                    }
+                }
 
-            prevBtn.addEventListener('click', () => {
-                playlist.prev();
-                updatePlayerUI();
+                if (importedCount > 0) {
+                    renderPlaylist();
+                    importStatus.textContent = `${importedCount} lagu berhasil diimpor!`;
+                } else {
+                    importStatus.textContent = 'Tidak ada file MP3 yang valid dipilih.';
+                }
+                importFile.value = '';
             });
             
-            // Event Listener untuk Import File
-            importFile.addEventListener('change', (event) => {
-                const file = event.target.files[0];
-                if (!file) {
-                    return;
+            // Audio Player Events
+            audioPlayer.addEventListener('play', () => playIcon.className = 'fas fa-pause');
+            audioPlayer.addEventListener('pause', () => playIcon.className = 'fas fa-play');
+            audioPlayer.addEventListener('ended', () => {
+                // Autoplay next song
+                if (playlist.currentNode && playlist.currentNode.next) {
+                    playSong(playlist.currentNode.next);
+                } else {
+                     // End of playlist
+                     playlist.currentNode = null;
+                     renderPlaylist();
                 }
-
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const content = e.target.result;
-                    const songs = content.split('\n').filter(song => song.trim() !== '');
-                    
-                    if (songs.length > 0) {
-                        songs.forEach(song => playlist.add(song.trim()));
-                        renderPlaylist();
-                        importStatus.textContent = `${songs.length} lagu berhasil diimpor!`;
-                    } else {
-                        importStatus.textContent = `File kosong atau format tidak sesuai.`;
-                    }
-                     // Reset input file agar bisa import file yang sama lagi
-                    importFile.value = '';
-                };
-                reader.onerror = () => {
-                    importStatus.textContent = `Gagal membaca file.`;
-                    importFile.value = '';
-                }
-                reader.readAsText(file);
             });
-
-
-            // Render pertama kali
-            renderPlaylist();
+            audioPlayer.addEventListener('loadedmetadata', () => {
+                totalDurationEl.textContent = formatTime(audioPlayer.duration);
+            });
+            audioPlayer.addEventListener('timeupdate', () => {
+                currentTimeEl.textContent = formatTime(audioPlayer.currentTime);
+                const progress = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+                progressBar.style.width = `${progress}%`;
+            });
+            
+            renderPlaylist(); // Initial render
         });
     </script>
 </body>
 </html>
+
