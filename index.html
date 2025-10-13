@@ -404,6 +404,12 @@
 
 
     <script type="module">
+        // --- Firebase Imports ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, addDoc, query, where, onSnapshot, updateDoc, serverTimestamp, writeBatch, orderBy, limit, arrayUnion, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    window.addEventListener('DOMContentLoaded', () => {
         // --- Firebase Configuration ---
         const firebaseConfig = {
             apiKey: "AIzaSyC6Es1HpmWqmNSaACoKG2wYPq_dBkyFYSs",
@@ -415,11 +421,6 @@
             measurementId: "G-LWKQTY831W"
         };
         
-        // --- Firebase Imports ---
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, collection, addDoc, query, where, onSnapshot, updateDoc, serverTimestamp, writeBatch, orderBy, limit, arrayUnion, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
         // --- Firebase Initialization ---
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -495,8 +496,8 @@
         const placeOrderBtn = document.getElementById('place-order-btn');
         const tutorialOverlay = document.getElementById('tutorial-overlay');
         const tutorialBox = document.getElementById('tutorial-box');
-        const calculateRiskBtn = document.getElementById('calculate-risk-btn'); // NEW
-        const riskCalcMessage = document.getElementById('risk-calc-message'); // NEW
+        const calculateRiskBtn = document.getElementById('calculate-risk-btn');
+        const riskCalcMessage = document.getElementById('risk-calc-message');
 
         // --- Initial Setup ---
         populatePairSelect();
@@ -547,7 +548,6 @@
             
             listenToMarketData();
             
-            // More robust chart initialization
             setupChart();
         }
 
@@ -618,7 +618,6 @@
         
         // --- Charting Logic ---
         function setupChart() {
-            // Use requestAnimationFrame to wait for the next browser paint
             requestAnimationFrame(() => {
                 if (initializeChart()) {
                     updateChart(activeChartPair);
@@ -1040,7 +1039,7 @@
             setTimeout(() => { toastNotification.classList.remove('show'); }, 4000);
         }
 
-        // --- NEW: Risk Calculator Logic ---
+        // --- Risk Calculator Logic ---
         function calculateLotSize() {
             const balanceText = accountBalanceDisplay.textContent;
             const currentBalance = parseFloat(balanceText.replace(/[^0-9.-]+/g,""));
@@ -1051,7 +1050,7 @@
             const orderType = orderTypeSelect.value;
             const entryPriceForPending = parseFloat(entryPriceInput.value);
 
-            riskCalcMessage.textContent = ''; // Clear previous message
+            riskCalcMessage.textContent = '';
             
             if (isNaN(riskPercent) || riskPercent <= 0) {
                 riskCalcMessage.textContent = 'Persentase risiko tidak valid.'; return;
@@ -1065,7 +1064,6 @@
                 riskCalcMessage.textContent = 'Tidak dapat mengambil harga saat ini.'; return;
             }
 
-            // Validate SL placement
             if ( (orderType.includes('buy') && stopLossPrice >= entryPrice) || (orderType.includes('sell') && stopLossPrice <= entryPrice) ) {
                 riskCalcMessage.textContent = 'Stop Loss tidak valid.'; return;
             }
@@ -1075,7 +1073,7 @@
             if (priceDiffPerUnit === 0) return;
 
             const pointValue = getPointValue(pair);
-            const riskPerLot = priceDiffPerUnit * pointValue * 1.0; // Per 1 standard lot
+            const riskPerLot = priceDiffPerUnit * pointValue * 1.0;
             
             let calculatedSize = riskAmount / riskPerLot;
 
@@ -1090,7 +1088,7 @@
         }
 
         calculateRiskBtn.addEventListener('click', calculateLotSize);
-
+    });
     </script>
 </body>
 </html>
