@@ -436,6 +436,7 @@
         let activeChartPair = 'EUR/USD';
         let openPositions = []; 
         let pendingOrders = [];
+        let chartResizeObserver = null;
 
         // --- UI Elements ---
         const authScreen = document.getElementById('auth-screen');
@@ -523,24 +524,16 @@
             listenToHistory(userId);
             listenToLeaderboard();
             
-            // Start market data simulation immediately
             listenToMarketData();
 
-            // Attempt to initialize the chart separately and safely
-            let chartInitAttempts = 0;
-            function attemptChartInit() {
-                chartInitAttempts++;
+            setTimeout(() => {
                 if (initializeChart()) {
-                    // Success
                     updateChart(activeChartPair);
-                } else if (chartInitAttempts < 10) { // Try up to 10 times
-                    setTimeout(attemptChartInit, 500);
                 } else {
-                    console.error("Gagal menginisialisasi grafik setelah beberapa kali percobaan.");
-                    chartContainer.innerHTML = `<div class="flex items-center justify-center h-full text-red-400">Gagal memuat grafik. Coba muat ulang halaman.</div>`;
+                     console.error("Gagal menginisialisasi grafik pada percobaan awal.");
+                     chartContainer.innerHTML = `<div class="flex items-center justify-center h-full text-yellow-400">Memuat grafik...</div>`;
                 }
-            }
-            attemptChartInit();
+            }, 200);
         }
 
         function cleanupDashboard() {
@@ -550,6 +543,7 @@
             if (historyUnsubscribe) historyUnsubscribe();
             if (leaderboardUnsubscribe) leaderboardUnsubscribe();
             if (userDocUnsubscribe) userDocUnsubscribe();
+            if (chartResizeObserver) chartResizeObserver.disconnect();
             openPositions = [];
             pendingOrders = [];
             if (chart) { chart.remove(); chart = null; }
@@ -610,43 +604,45 @@
         // --- Charting Logic ---
         function initializeChart() {
             try {
-                // Pre-condition check: library and container must be ready
                 if (typeof LightweightCharts === 'undefined' || typeof LightweightCharts.createChart !== 'function' || chartContainer.clientWidth <= 0) {
-                    return false; // Not ready yet
+                    return false;
                 }
 
-                if (chart) {
-                    chart.remove();
-                    chart = null;
-                }
-                chartContainer.innerHTML = ''; // Clear previous content/errors
+                if (chart) chart.remove();
+                chartContainer.innerHTML = '';
 
-                const newChart = LightweightCharts.createChart(chartContainer, {
-                    width: chartContainer.clientWidth, height: chartContainer.clientHeight,
+                chart = LightweightCharts.createChart(chartContainer, {
+                    width: chartContainer.clientWidth,
+                    height: chartContainer.clientHeight,
                     layout: { background: { color: '#1e293b' }, textColor: 'rgba(255, 255, 255, 0.9)' },
                     grid: { vertLines: { color: '#334155' }, horzLines: { color: '#334155' } },
                     crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
                     rightPriceScale: { borderColor: '#475569' },
                     timeScale: { borderColor: '#475569' },
                 });
-
-                // Post-condition check: ensure the created object is valid
-                if (!newChart || typeof newChart.addCandlestickSeries !== 'function') {
-                    console.error("LightweightCharts.createChart returned an invalid object.");
-                    return false; // Initialization failed
-                }
                 
-                chart = newChart;
                 candlestickSeries = chart.addCandlestickSeries({
                     upColor: '#22c55e', wickUpColor: '#22c55e', downColor: '#ef4444', wickDownColor: '#ef4444', borderVisible: false,
                 });
                 
-                return true; // Success
+                // Setup resize observer
+                if (chartResizeObserver) chartResizeObserver.disconnect();
+                chartResizeObserver = new ResizeObserver(entries => {
+                    const entry = entries[0];
+                    if (entry && entry.contentRect.width > 0) {
+                        chart.applyOptions({ width: entry.contentRect.width });
+                    }
+                });
+                chartResizeObserver.observe(chartContainer);
+
+                return true;
             } catch (error) {
-                console.error("An exception occurred during chart initialization:", error);
-                return false; // Initialization failed due to an exception
+                console.error("Exception during chart initialization:", error);
+                chartContainer.innerHTML = `<div class="flex items-center justify-center h-full text-red-400">Terjadi error saat membuat grafik.</div>`;
+                return false;
             }
         }
+
         function updateChart(pair) {
             if (!chart || !candlestickSeries) return;
             chartTitle.textContent = `Grafik Harga: ${pair}`;
@@ -1019,5 +1015,4 @@
     </script>
 </body>
 </html>
-
 
