@@ -522,11 +522,16 @@
             listenToPendingOrders(userId);
             listenToHistory(userId);
             listenToLeaderboard();
+            
+            // Start market data simulation immediately
+            listenToMarketData();
 
+            // Attempt to initialize the chart separately
             function attemptChartInit() {
                 if (typeof LightweightCharts !== 'undefined' && chartContainer.clientWidth > 0) {
                     initializeChart();
-                    listenToMarketData();
+                    // Chart is ready, so update it with existing data
+                    updateChart(activeChartPair);
                 } else {
                     setTimeout(attemptChartInit, 100);
                 }
@@ -637,7 +642,9 @@
                 currentPrices[pair] = { price: currentPrice, direction: 'stale' };
             });
             renderMarketWatch();
-            updateChart(activeChartPair);
+            if (chart) {
+                updateChart(activeChartPair);
+            }
             if (priceInterval) clearInterval(priceInterval);
             priceInterval = setInterval(() => {
                 ASSETS.forEach(pair => {
