@@ -526,14 +526,19 @@
             // Start market data simulation immediately
             listenToMarketData();
 
-            // Attempt to initialize the chart separately
+            // Attempt to initialize the chart separately and safely
             function attemptChartInit() {
-                if (typeof LightweightCharts !== 'undefined' && chartContainer.clientWidth > 0) {
-                    initializeChart();
-                    // Chart is ready, so update it with existing data
-                    updateChart(activeChartPair);
-                } else {
-                    setTimeout(attemptChartInit, 100);
+                try {
+                    if (typeof LightweightCharts !== 'undefined' && typeof LightweightCharts.createChart === 'function' && chartContainer.clientWidth > 0) {
+                        initializeChart();
+                        // Chart is ready, so update it with existing data
+                        updateChart(activeChartPair);
+                    } else {
+                        setTimeout(attemptChartInit, 150); // Slightly increased delay
+                    }
+                } catch (error) {
+                    console.error("Gagal menginisialisasi grafik:", error);
+                    chartContainer.innerHTML = `<div class="flex items-center justify-center h-full text-red-400">Gagal memuat grafik. Coba muat ulang halaman.</div>`;
                 }
             }
             attemptChartInit();
@@ -605,7 +610,12 @@
         
         // --- Charting Logic ---
         function initializeChart() {
-            if (chart) return;
+            if (chart) {
+                chart.remove();
+                chart = null;
+            }
+            chartContainer.innerHTML = ''; // Clear previous content/errors
+
             chart = LightweightCharts.createChart(chartContainer, {
                 width: chartContainer.clientWidth, height: chartContainer.clientHeight,
                 layout: { background: { color: '#1e293b' }, textColor: 'rgba(255, 255, 255, 0.9)' },
@@ -614,6 +624,12 @@
                 rightPriceScale: { borderColor: '#475569' },
                 timeScale: { borderColor: '#475569' },
             });
+
+            // Defensive check to ensure chart object is valid
+            if (!chart || typeof chart.addCandlestickSeries !== 'function') {
+                throw new Error("Objek grafik yang dibuat tidak valid atau metode tidak ditemukan.");
+            }
+
             candlestickSeries = chart.addCandlestickSeries({
                 upColor: '#22c55e', wickUpColor: '#22c55e', downColor: '#ef4444', wickDownColor: '#ef4444', borderVisible: false,
             });
