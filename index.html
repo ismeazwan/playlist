@@ -398,7 +398,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-analytics.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, collection, addDoc, query, where, onSnapshot, updateDoc, serverTimestamp, writeBatch, orderBy, limit, arrayUnion, deleteDoc } from "https://www.gstatic.com/firebasejs/12.4.0/firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, addDoc, query, where, onSnapshot, updateDoc, serverTimestamp, writeBatch, orderBy, limit, arrayUnion, deleteDoc } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
 
         // --- Firebase Initialization ---
         const app = initializeApp(firebaseConfig);
@@ -1020,4 +1020,3 @@
     </script>
 </body>
 </html>
-
