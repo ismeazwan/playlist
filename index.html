@@ -398,7 +398,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-analytics.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, collection, addDoc, query, where, onSnapshot, updateDoc, serverTimestamp, writeBatch, orderBy, limit, arrayUnion, deleteDoc } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, addDoc, query, where, onSnapshot, updateDoc, serverTimestamp, writeBatch, orderBy, limit, arrayUnion, deleteDoc } from "https://www.gstatic.com/firebasejs/12.4.0/firestore.js";
 
         // --- Firebase Initialization ---
         const app = initializeApp(firebaseConfig);
@@ -525,15 +525,9 @@
             listenToLeaderboard();
             
             listenToMarketData();
-
-            setTimeout(() => {
-                if (initializeChart()) {
-                    updateChart(activeChartPair);
-                } else {
-                     console.error("Gagal menginisialisasi grafik pada percobaan awal.");
-                     chartContainer.innerHTML = `<div class="flex items-center justify-center h-full text-yellow-400">Memuat grafik...</div>`;
-                }
-            }, 200);
+            
+            // More robust chart initialization
+            setupChart();
         }
 
         function cleanupDashboard() {
@@ -602,6 +596,18 @@
         tutorialOverlay.querySelector('#tutorial-skip-btn').addEventListener('click', () => endTutorial(true));
         
         // --- Charting Logic ---
+        function setupChart() {
+            // Use requestAnimationFrame to wait for the next browser paint
+            requestAnimationFrame(() => {
+                if (initializeChart()) {
+                    updateChart(activeChartPair);
+                } else {
+                    console.error("Gagal menginisialisasi grafik setelah menunggu render.");
+                    chartContainer.innerHTML = `<div class="flex items-center justify-center h-full text-red-400">Gagal memuat grafik. Coba muat ulang.</div>`;
+                }
+            });
+        }
+
         function initializeChart() {
             try {
                 if (typeof LightweightCharts === 'undefined' || typeof LightweightCharts.createChart !== 'function' || chartContainer.clientWidth <= 0) {
@@ -625,12 +631,11 @@
                     upColor: '#22c55e', wickUpColor: '#22c55e', downColor: '#ef4444', wickDownColor: '#ef4444', borderVisible: false,
                 });
                 
-                // Setup resize observer
                 if (chartResizeObserver) chartResizeObserver.disconnect();
                 chartResizeObserver = new ResizeObserver(entries => {
                     const entry = entries[0];
                     if (entry && entry.contentRect.width > 0) {
-                        chart.applyOptions({ width: entry.contentRect.width });
+                        chart.resize(entry.contentRect.width, entry.contentRect.height);
                     }
                 });
                 chartResizeObserver.observe(chartContainer);
