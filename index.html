@@ -207,7 +207,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, collection, addDoc, setDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, onSnapshot, collection, addDoc, setDoc, deleteDoc, serverTimestamp, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Config & App ID ---
         let firebaseConfig;
@@ -379,6 +379,79 @@
             });
         }
         
+        async function openTrade(type) {
+            if (!userId) {
+                showModal('Error', 'User not authenticated.');
+                return;
+            }
+            
+            const symbol = instrumentSelect.value;
+            const volume = parseFloat(lotSizeInput.value);
+            
+            if (isNaN(volume) || volume <= 0) {
+                showModal('Invalid Input', 'Please enter a valid lot size.');
+                return;
+            }
+
+            const tradeData = {
+                userId: userId, // Added for security rule validation
+                symbol,
+                type,
+                volume,
+                openPrice: type === 'BUY' ? marketData[symbol].ask : marketData[symbol].bid,
+                openTime: serverTimestamp()
+            };
+
+            const basePath = `/artifacts/${appId}/users/${userId}`;
+            const positionsColRef = collection(db, `${basePath}/positions`);
+            try {
+                await addDoc(positionsColRef, tradeData);
+                showModal('Success', `${type} order for ${volume} lot(s) of ${symbol} has been placed.`);
+            } catch (error) {
+                console.error("Error opening trade: ", error);
+                showModal('Error', 'Could not open the trade. Please try again.');
+            }
+        }
+        
+        async function closePosition(positionId) {
+             if (!userId) {
+                showModal('Error', 'User not authenticated.');
+                return;
+            }
+            
+            const pos = openPositions.find(p => p.id === positionId);
+            if (!pos) return;
+
+            const closePrice = pos.type === 'BUY' ? marketData[pos.symbol].bid : marketData[pos.symbol].ask;
+            const priceDiff = pos.type === 'BUY' ? (closePrice - pos.openPrice) : (pos.openPrice - closePrice);
+            const pointValue = pos.symbol.includes('JPY') ? 1000 : 100000;
+            const profit = priceDiff * pos.volume * pointValue;
+            
+            const historyData = {
+                ...pos,
+                closePrice,
+                closeTime: serverTimestamp(),
+                profit
+            };
+            delete historyData.id;
+
+            const basePath = `/artifacts/${appId}/users/${userId}`;
+            const historyColRef = collection(db, `${basePath}/history`);
+            const positionDocRef = doc(db, `${basePath}/positions/${positionId}`);
+            const accountDocRef = doc(db, `${basePath}/account/info`);
+            
+            try {
+                await addDoc(historyColRef, historyData);
+                await deleteDoc(positionDocRef);
+                const newBalance = accountInfo.balance + profit;
+                await updateDoc(accountDocRef, { balance: newBalance }); // Use updateDoc for safety
+                showModal('Position Closed', `Position for ${pos.symbol} closed with a profit of ${formatCurrency(profit)}.`);
+            } catch (error) {
+                console.error("Error closing position: ", error);
+                showModal('Error', 'Could not close the position. Please try again.');
+            }
+        }
+
         // --- Auth Event Handlers ---
         loginForm.addEventListener('submit', (e) => {
             e.preventDefault();
@@ -405,7 +478,7 @@
                 // Create initial account document with $1000 balance
                 const basePath = `/artifacts/${appId}/users/${user.uid}`;
                 const accountDocRef = doc(db, `${basePath}/account/info`);
-                await setDoc(accountDocRef, { balance: 1000, equity: 1000 });
+                await setDoc(accountDocRef, { balance: 1000 }); // Only store balance
                 
             } catch(error) {
                 authErrorEl.textContent = error.message;
@@ -477,12 +550,6 @@
             for (const symbol in marketData) { const data = marketData[symbol]; data.lastBid = data.bid; const pips = symbol.includes('JPY') ? 0.01 : 0.0001; const volatility = pips * 5; const change = (Math.random() - 0.5) * volatility; data.bid += change; data.ask = data.bid + (pips * (2 + Math.random() * 2)); }
             renderMarketWatch(); renderOpenPositions();
             if (candlestickSeries && currentChartData.length > 0) { const selectedSymbol = instrumentSelect.value; const newPrice = marketData[selectedSymbol].bid; let lastCandle = currentChartData[currentChartData.length - 1]; lastCandle.close = newPrice; lastCandle.high = Math.max(lastCandle.high, newPrice); lastCandle.low = Math.min(lastCandle.low, newPrice); candlestickSeries.update(lastCandle); }
-        }
-        async function openTrade(type) {
-            if (!userId) { showModal('Error', 'User not authenticated.'); return; } const symbol = instrumentSelect.value; const volume = parseFloat(lotSizeInput.value); if (isNaN(volume) || volume <= 0) { showModal('Invalid Input', 'Please enter a valid lot size.'); return; } const tradeData = { symbol, type, volume, openPrice: type === 'BUY' ? marketData[symbol].ask : marketData[symbol].bid, openTime: serverTimestamp() }; const basePath = `/artifacts/${appId}/users/${userId}`; const positionsColRef = collection(db, `${basePath}/positions`); try { await addDoc(positionsColRef, tradeData); showModal('Success', `${type} order for ${volume} lot(s) of ${symbol} has been placed.`); } catch (error) { console.error("Error opening trade: ", error); showModal('Error', 'Could not open the trade. Please try again.'); }
-        }
-        async function closePosition(positionId) {
-            if (!userId) { showModal('Error', 'User not authenticated.'); return; } const pos = openPositions.find(p => p.id === positionId); if (!pos) return; const closePrice = pos.type === 'BUY' ? marketData[pos.symbol].bid : marketData[pos.symbol].ask; const priceDiff = pos.type === 'BUY' ? (closePrice - pos.openPrice) : (pos.openPrice - closePrice); const pointValue = pos.symbol.includes('JPY') ? 1000 : 100000; const profit = priceDiff * pos.volume * pointValue; const historyData = { ...pos, closePrice, closeTime: serverTimestamp(), profit }; delete historyData.id; const basePath = `/artifacts/${appId}/users/${userId}`; const historyColRef = collection(db, `${basePath}/history`); const positionDocRef = doc(db, `${basePath}/positions/${positionId}`); const accountDocRef = doc(db, `${basePath}/account/info`); try { await addDoc(historyColRef, historyData); await deleteDoc(positionDocRef); const newBalance = accountInfo.balance + profit; await setDoc(accountDocRef, { balance: newBalance }, { merge: true }); showModal('Position Closed', `Position for ${pos.symbol} closed with a profit of ${formatCurrency(profit)}.`); } catch (error) { console.error("Error closing position: ", error); showModal('Error', 'Could not close the position. Please try again.'); }
         }
 
         // --- Event Listeners ---
