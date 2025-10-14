@@ -207,7 +207,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, collection, addDoc, setDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, onSnapshot, collection, addDoc, setDoc, deleteDoc, serverTimestamp, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Config & App ID ---
         let firebaseConfig;
@@ -422,7 +422,7 @@
             const pos = openPositions.find(p => p.id === positionId);
             if (!pos) return;
             const closePrice = pos.type === 'BUY' ? marketData[pos.symbol].bid : marketData[pos.symbol].ask;
-            const priceDiff = pos.type === 'BUY' ? (closePrice - pos.openPrice) : (pos.openPrice - currentPrice);
+            const priceDiff = pos.type === 'BUY' ? (closePrice - pos.openPrice) : (pos.openPrice - closePrice);
             const pointValue = pos.symbol.includes('JPY') ? 1000 : 100000;
             const profit = priceDiff * pos.volume * pointValue;
             const historyData = {
@@ -437,10 +437,10 @@
             const positionDocRef = doc(db, `${basePath}/positions/${positionId}`);
             const accountDocRef = doc(db, `${basePath}/account/info`);
             try {
+                const newBalance = (accountInfo.balance || 0) + profit;
                 await addDoc(historyColRef, historyData);
                 await deleteDoc(positionDocRef);
-                const newBalance = accountInfo.balance + profit;
-                await setDoc(accountDocRef, { balance: newBalance }, { merge: true });
+                await updateDoc(accountDocRef, { balance: newBalance });
                 showModal('Position Closed', `Position for ${pos.symbol} closed with a profit of ${formatCurrency(profit)}.`);
             } catch (error) {
                 console.error("Error closing position: ", error);
@@ -468,7 +468,7 @@
                 const user = userCredential.user;
                 const basePath = `/artifacts/${appId}/users/${user.uid}`;
                 const accountDocRef = doc(db, `${basePath}/account/info`);
-                await setDoc(accountDocRef, { balance: 1000, equity: 1000 });
+                await setDoc(accountDocRef, { balance: 1000, userId: user.uid });
             } catch(error) {
                 authErrorEl.textContent = error.message;
             }
