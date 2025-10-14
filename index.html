@@ -228,6 +228,8 @@
             firebaseConfig = hardcodedConfig;
         }
 
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
         // --- Initialize Firebase ---
         let app, db, auth;
         if (firebaseConfig && firebaseConfig.apiKey) {
@@ -438,7 +440,7 @@
                 const newBalance = (accountInfo.balance || 0) + profit;
                 await addDoc(historyColRef, historyData);
                 await deleteDoc(positionDocRef);
-                await updateDoc(accountDocRef, { balance: newBalance });
+                await setDoc(accountDocRef, { balance: newBalance }, { merge: true });
                 showModal('Position Closed', `Position for ${pos.symbol} closed with a profit of ${formatCurrency(profit)}.`);
             } catch (error) {
                 console.error("Error closing position: ", error);
