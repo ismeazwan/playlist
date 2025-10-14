@@ -317,6 +317,14 @@
             if (marketIntervalId) clearInterval(marketIntervalId);
             marketIntervalId = null;
 
+            // Properly remove the chart instance
+            if (chart) {
+                chart.remove();
+                chart = null;
+                candlestickSeries = null;
+            }
+            chartContainer.innerHTML = ''; // Ensure the container is empty
+
             // Reset state
             userId = null;
             openPositions = [];
