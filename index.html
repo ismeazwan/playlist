@@ -21,20 +21,67 @@
 </head>
 <body class="bg-gray-900 text-gray-200">
 
-    <div id="loading-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center z-50">
+    <!-- Auth Container -->
+    <div id="auth-container" class="min-h-screen flex items-center justify-center">
+        <div class="max-w-md w-full bg-gray-800 p-8 rounded-lg shadow-lg">
+            <!-- Login Form -->
+            <div id="login-form">
+                <h2 class="text-3xl font-bold text-center text-white mb-6">Login</h2>
+                <form>
+                    <div class="mb-4">
+                        <label for="login-email" class="block text-sm font-medium text-gray-400 mb-2">Email Address</label>
+                        <input type="email" id="login-email" class="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:ring-blue-500 focus:border-blue-500" required>
+                    </div>
+                    <div class="mb-6">
+                        <label for="login-password" class="block text-sm font-medium text-gray-400 mb-2">Password</label>
+                        <input type="password" id="login-password" class="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:ring-blue-500 focus:border-blue-500" required>
+                    </div>
+                    <button type="submit" id="login-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition duration-200">Login</button>
+                </form>
+                <p class="text-center text-sm text-gray-400 mt-6">
+                    Don't have an account? <a href="#" id="show-register" class="text-blue-400 hover:underline">Register here</a>
+                </p>
+            </div>
+
+            <!-- Register Form -->
+            <div id="register-form" class="hidden">
+                <h2 class="text-3xl font-bold text-center text-white mb-6">Create Account</h2>
+                <form>
+                    <div class="mb-4">
+                        <label for="register-email" class="block text-sm font-medium text-gray-400 mb-2">Email Address</label>
+                        <input type="email" id="register-email" class="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:ring-blue-500 focus:border-blue-500" required>
+                    </div>
+                    <div class="mb-6">
+                        <label for="register-password" class="block text-sm font-medium text-gray-400 mb-2">Password</label>
+                        <input type="password" id="register-password" class="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:ring-blue-500 focus:border-blue-500" required>
+                    </div>
+                    <button type="submit" id="register-button" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md transition duration-200">Register</button>
+                </form>
+                <p class="text-center text-sm text-gray-400 mt-6">
+                    Already have an account? <a href="#" id="show-login" class="text-blue-400 hover:underline">Login here</a>
+                </p>
+            </div>
+            <p id="auth-error" class="text-red-400 text-center mt-4 text-sm"></p>
+        </div>
+    </div>
+
+    <div id="loading-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center z-50 hidden">
         <div class="flex flex-col items-center">
             <svg class="animate-spin h-10 w-10 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <p class="mt-4 text-lg">Connecting to Trading Server...</p>
+            <p class="mt-4 text-lg">Loading Trading Desk...</p>
         </div>
     </div>
 
     <div id="app-content" class="container mx-auto p-2 sm:p-4 max-w-7xl hidden">
-        <header class="mb-4">
-            <h1 class="text-3xl font-bold text-white">MIFX Trading Clone</h1>
-            <p class="text-sm text-gray-400">User ID: <span id="user-id" class="font-mono"></span></p>
+        <header class="mb-4 flex justify-between items-center">
+            <div>
+                 <h1 class="text-3xl font-bold text-white">MIFX Trading Clone</h1>
+                 <p class="text-sm text-gray-400">User: <span id="user-email" class="font-mono"></span></p>
+            </div>
+            <button id="logout-button" class="bg-gray-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition duration-200">Logout</button>
         </header>
 
         <main class="grid grid-cols-1 lg:grid-cols-12 gap-4">
@@ -45,7 +92,7 @@
                 <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
                     <h2 class="text-xl font-semibold mb-3 border-b border-gray-700 pb-2">Account Info</h2>
                     <div class="space-y-2 text-sm">
-                        <div class="flex justify-between"><span>Balance:</span> <span id="balance-value" class="font-mono font-semibold">$10.00</span></div>
+                        <div class="flex justify-between"><span>Balance:</span> <span id="balance-value" class="font-mono font-semibold">$0.00</span></div>
                         <div class="flex justify-between"><span>Equity:</span> <span id="equity-value" class="font-mono font-semibold">$0.00</span></div>
                         <div class="flex justify-between"><span>Floating P/L:</span> <span id="pl-value" class="font-mono font-semibold">$0.00</span></div>
                     </div>
@@ -116,9 +163,7 @@
                                                 <th class="p-2">Action</th>
                                             </tr>
                                         </thead>
-                                        <tbody id="open-positions-body" class="divide-y divide-gray-700">
-                                            <!-- Open positions will be injected here -->
-                                        </tbody>
+                                        <tbody id="open-positions-body" class="divide-y divide-gray-700"></tbody>
                                     </table>
                                 </div>
                             </div>
@@ -136,9 +181,7 @@
                                                 <th class="p-2">Profit/Loss</th>
                                             </tr>
                                         </thead>
-                                        <tbody id="history-body" class="divide-y divide-gray-700">
-                                            <!-- History will be injected here -->
-                                        </tbody>
+                                        <tbody id="history-body" class="divide-y divide-gray-700"></tbody>
                                     </table>
                                 </div>
                             </div>
@@ -146,7 +189,6 @@
                     </div>
                 </div>
             </section>
-
         </main>
     </div>
 
@@ -164,51 +206,43 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, onSnapshot, collection, addDoc, setDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Firebase Config, App ID, and Initial Auth Token ---
+        // --- Firebase Config & App ID ---
         let firebaseConfig;
-        
-        // Fallback config if environment variable is not available
         const hardcodedConfig = {
           apiKey: "AIzaSyC6Es1HpmWqmNSaACoKG2wYPq_dBkyFYSs",
           authDomain: "database-forex.firebaseapp.com",
           projectId: "database-forex",
-          storageBucket: "database-forex.appspot.com", // Corrected standard format
+          storageBucket: "database-forex.appspot.com",
           messagingSenderId: "780234110549",
           appId: "1:780234110549:web:b72051f7e28ea2ec3506dc",
           measurementId: "G-LWKQTY831W"
         };
         
-        // Try to use environment variable first, otherwise use hardcoded fallback
         if (typeof __firebase_config !== 'undefined' && __firebase_config !== '{}') {
             firebaseConfig = JSON.parse(__firebase_config);
         } else {
-            console.warn("Firebase environment variable not found. Using hardcoded config as a fallback.");
+            console.warn("Using hardcoded Firebase config.");
             firebaseConfig = hardcodedConfig;
         }
 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
 
         // --- Initialize Firebase ---
-        let app;
-        let db;
-        let auth;
-        
+        let app, db, auth;
         if (firebaseConfig && firebaseConfig.apiKey) {
             app = initializeApp(firebaseConfig);
             db = getFirestore(app);
             auth = getAuth(app);
         } else {
-            const loadingOverlay = document.getElementById('loading-overlay');
-            loadingOverlay.innerHTML = `<div class="text-center"><h2 class="text-xl text-red-500">Firebase Config Missing</h2><p class="text-gray-400">Could not initialize the application.</p></div>`;
+            document.body.innerHTML = `<div class="text-center p-8"><h2 class="text-xl text-red-500">Firebase Config Missing</h2><p class="text-gray-400">Could not initialize.</p></div>`;
         }
 
         // --- Global State ---
         let userId = null;
+        let unsubscribeListeners = [];
         let marketData = {
             'EURUSD': { bid: 1.0850, ask: 1.0852, lastBid: 1.0850 },
             'XAUUSD': { bid: 2350.50, ask: 2350.90, lastBid: 2350.50 },
@@ -217,16 +251,21 @@
         };
         let openPositions = [];
         let accountInfo = { balance: 0, equity: 0 };
-        let chart;
-        let candlestickSeries;
-        let currentChartData = [];
-        let isAppInitialized = false; // Flag to prevent re-initialization
+        let chart, candlestickSeries, currentChartData = [];
         let marketIntervalId = null;
         
         // --- DOM Elements ---
+        const authContainer = document.getElementById('auth-container');
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+        const authErrorEl = document.getElementById('auth-error');
+        const showRegisterBtn = document.getElementById('show-register');
+        const showLoginBtn = document.getElementById('show-login');
+        const logoutButton = document.getElementById('logout-button');
+        
         const loadingOverlay = document.getElementById('loading-overlay');
         const appContent = document.getElementById('app-content');
-        const userIdEl = document.getElementById('user-id');
+        const userEmailEl = document.getElementById('user-email');
         const marketWatchList = document.getElementById('market-watch-list');
         const balanceValueEl = document.getElementById('balance-value');
         const equityValueEl = document.getElementById('equity-value');
@@ -258,242 +297,72 @@
         }
         modalClose.addEventListener('click', () => messageModal.classList.add('hidden'));
 
-        // --- Chart Logic ---
-        function initChart() {
-            if (!window.LightweightCharts) {
-                console.error("LightweightCharts library not loaded.");
-                return;
-            }
-            if (!chartContainer || chartContainer.clientWidth === 0 || chartContainer.clientHeight === 0) {
-                console.error("Chart container not ready or has no dimensions.");
-                return;
-            }
-            // Access LightweightCharts from the global window object
-            const { createChart, CrosshairMode } = window.LightweightCharts;
+        // --- App Setup & Teardown ---
+        function setupAppForUser(user) {
+            userId = user.uid;
+            userEmailEl.textContent = user.email;
+
+            loadingOverlay.classList.remove('hidden');
+            authContainer.classList.add('hidden');
+
+            setupFirestoreListeners(userId);
+        }
+
+        function teardownApp() {
+            // Unsubscribe from all Firestore listeners
+            unsubscribeListeners.forEach(unsub => unsub());
+            unsubscribeListeners = [];
             
-            chart = createChart(chartContainer, {
-                width: chartContainer.clientWidth,
-                height: chartContainer.clientHeight,
-                layout: {
-                    backgroundColor: '#1f2937', // gray-800
-                    textColor: 'rgba(255, 255, 255, 0.9)',
-                },
-                grid: {
-                    vertLines: { color: '#374151' }, // gray-700
-                    horzLines: { color: '#374151' },
-                },
-                crosshair: { mode: CrosshairMode.Normal },
-                rightPriceScale: { borderColor: '#4b5563' }, // gray-600
-                timeScale: { borderColor: '#4b5563' },
-            });
+            // Stop market simulation
+            if (marketIntervalId) clearInterval(marketIntervalId);
+            marketIntervalId = null;
 
-            candlestickSeries = chart.addCandlestickSeries({
-                upColor: '#22c55e',
-                downColor: '#ef4444',
-                borderDownColor: '#ef4444',
-                borderUpColor: '#22c55e',
-                wickDownColor: '#ef4444',
-                wickUpColor: '#22c55e',
-            });
+            // Reset state
+            userId = null;
+            openPositions = [];
+            accountInfo = { balance: 0, equity: 0 };
 
-            // Handle chart resizing
-            new ResizeObserver(entries => {
-                if (entries.length === 0 || entries[0].target !== chartContainer) { return; }
-                const newRect = entries[0].contentRect;
-                chart.applyOptions({ width: newRect.width, height: newRect.height });
-            }).observe(chartContainer);
-        }
-
-        function generateInitialChartData(symbol) {
-            if (!candlestickSeries) return; // Don't run if chart is not ready
-            const data = [];
-            let price = marketData[symbol].bid;
-            const isJPY = symbol.includes('JPY');
-            const pips = isJPY ? 0.01 : 0.0001;
-            
-            const now = Math.floor(Date.now() / 1000);
-            let currentTime = now - (150 * 60); // 150 minutes ago
-
-            for (let i = 0; i < 150; i++) {
-                const open = price;
-                const close = open + (Math.random() - 0.5) * pips * 20;
-                const high = Math.max(open, close) + Math.random() * pips * 10;
-                const low = Math.min(open, close) - Math.random() * pips * 10;
-                price = close;
-                
-                data.push({
-                    time: currentTime,
-                    open,
-                    high,
-                    low,
-                    close,
-                });
-                currentTime += 60; // Add 1 minute
-            }
-            currentChartData = data;
-            candlestickSeries.setData(currentChartData);
-        }
-
-        // --- UI Rendering ---
-        const formatCurrency = (value) => `$${value.toFixed(2)}`;
-        
-        function renderMarketWatch() {
-            marketWatchList.innerHTML = '';
-            for (const symbol in marketData) {
-                const data = marketData[symbol];
-                const priceChangeClass = data.bid > data.lastBid ? 'price-up' : (data.bid < data.lastBid ? 'price-down' : '');
-                
-                const element = document.createElement('div');
-                element.className = 'p-2 rounded-md bg-gray-700/50 flex justify-between items-center cursor-pointer hover:bg-gray-600/50';
-                element.innerHTML = `
-                    <div>
-                        <div class="font-bold">${symbol}</div>
-                        <div class="text-xs text-gray-400">${symbol === 'XAUUSD' ? 'Gold' : 'Forex'}</div>
-                    </div>
-                    <div class="text-right font-mono ${priceChangeClass}">
-                        <div>${data.bid.toFixed(symbol === 'XAUUSD' || symbol === 'USDJPY' ? 2 : 4)}</div>
-                    </div>
-                `;
-                element.addEventListener('click', () => {
-                    instrumentSelect.value = symbol;
-                    instrumentSelect.dispatchEvent(new Event('change'));
-                });
-                marketWatchList.appendChild(element);
-            }
-        }
-
-        function renderAccountInfo(totalPL) {
-            accountInfo.equity = accountInfo.balance + totalPL;
-            balanceValueEl.textContent = formatCurrency(accountInfo.balance);
-            equityValueEl.textContent = formatCurrency(accountInfo.equity);
-            
-            plValueEl.textContent = formatCurrency(totalPL);
-            plValueEl.className = `font-mono font-semibold ${totalPL >= 0 ? 'price-up' : 'price-down'}`;
-        }
-        
-        function renderOpenPositions() {
-            openPositionsBody.innerHTML = '';
-            let totalPL = 0;
-
-            if (openPositions.length === 0) {
-                 openPositionsBody.innerHTML = `<tr><td colspan="7" class="text-center p-4 text-gray-500">No open positions.</td></tr>`;
-            }
-
-            openPositions.forEach(pos => {
-                const currentPrice = pos.type === 'BUY' ? marketData[pos.symbol].bid : marketData[pos.symbol].ask;
-                const priceDiff = pos.type === 'BUY' ? (currentPrice - pos.openPrice) : (pos.openPrice - currentPrice);
-                
-                const pointValue = pos.symbol.includes('JPY') ? 1000 : 100000;
-                const profit = priceDiff * pos.volume * pointValue;
-                totalPL += profit;
-
-                const profitClass = profit >= 0 ? 'price-up' : 'price-down';
-                
-                const row = document.createElement('tr');
-                row.className = 'hover:bg-gray-700/50';
-                row.innerHTML = `
-                    <td class="p-2 font-semibold">${pos.symbol}</td>
-                    <td class="p-2 font-semibold ${pos.type === 'BUY' ? 'text-green-500' : 'text-red-500'}">${pos.type}</td>
-                    <td class="p-2">${pos.volume}</td>
-                    <td class="p-2 font-mono">${pos.openPrice.toFixed(pos.symbol.includes('JPY') ? 2 : 4)}</td>
-                    <td class="p-2 font-mono">${currentPrice.toFixed(pos.symbol.includes('JPY') ? 2 : 4)}</td>
-                    <td class="p-2 font-mono font-semibold ${profitClass}">${formatCurrency(profit)}</td>
-                    <td class="p-2"><button data-id="${pos.id}" class="close-btn text-xs bg-gray-600 hover:bg-red-600 px-2 py-1 rounded">Close</button></td>
-                `;
-                openPositionsBody.appendChild(row);
-            });
-            positionsCountEl.textContent = openPositions.length;
-            renderAccountInfo(totalPL);
-        }
-
-        function renderHistory(history) {
-            historyBody.innerHTML = '';
-            if (history.length === 0) {
-                 historyBody.innerHTML = `<tr><td colspan="6" class="text-center p-4 text-gray-500">No trading history.</td></tr>`;
-            }
-
-            history.forEach(trade => {
-                const profitClass = trade.profit >= 0 ? 'price-up' : 'price-down';
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td class="p-2 font-semibold">${trade.symbol}</td>
-                    <td class="p-2 font-semibold ${trade.type === 'BUY' ? 'text-green-500' : 'text-red-500'}">${trade.type}</td>
-                    <td class="p-2">${trade.volume}</td>
-                    <td class="p-2 font-mono">${trade.openPrice.toFixed(trade.symbol.includes('JPY') ? 2 : 4)}</td>
-                    <td class="p-2 font-mono">${trade.closePrice.toFixed(trade.symbol.includes('JPY') ? 2 : 4)}</td>
-                    <td class="p-2 font-mono font-semibold ${profitClass}">${formatCurrency(trade.profit)}</td>
-                `;
-                historyBody.appendChild(row);
-            });
-        }
-
-
-        // --- Market Simulation ---
-        function simulateMarket() {
-            for (const symbol in marketData) {
-                const data = marketData[symbol];
-                data.lastBid = data.bid;
-                const pips = symbol.includes('JPY') ? 0.01 : 0.0001;
-                const volatility = pips * 5;
-                const change = (Math.random() - 0.5) * volatility;
-                
-                data.bid += change;
-                data.ask = data.bid + (pips * (2 + Math.random() * 2));
-            }
-            renderMarketWatch();
-            renderOpenPositions();
-
-            if (candlestickSeries && currentChartData.length > 0) {
-                const selectedSymbol = instrumentSelect.value;
-                const newPrice = marketData[selectedSymbol].bid;
-                let lastCandle = currentChartData[currentChartData.length - 1];
-                
-                lastCandle.close = newPrice;
-                lastCandle.high = Math.max(lastCandle.high, newPrice);
-                lastCandle.low = Math.min(lastCandle.low, newPrice);
-                
-                candlestickSeries.update(lastCandle);
-            }
+            // Show login screen
+            appContent.classList.add('hidden');
+            authContainer.classList.remove('hidden');
+            loadingOverlay.classList.add('hidden');
         }
 
         // --- Firebase Logic ---
-        async function setupFirestoreListeners(uid) {
+        function setupFirestoreListeners(uid) {
             const basePath = `/artifacts/${appId}/users/${uid}`;
             
             const accountDocRef = doc(db, `${basePath}/account/info`);
-            onSnapshot(accountDocRef, (docSnap) => {
+            const unsubAccount = onSnapshot(accountDocRef, (docSnap) => {
                 if (docSnap.exists()) {
                     accountInfo = docSnap.data();
-                } else {
-                    setDoc(accountDocRef, { balance: 10000, equity: 10000 });
+                    renderOpenPositions();
                 }
-                renderOpenPositions();
             });
 
             const positionsColRef = collection(db, `${basePath}/positions`);
-            onSnapshot(positionsColRef, (snapshot) => {
+            const unsubPositions = onSnapshot(positionsColRef, (snapshot) => {
                 openPositions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 renderOpenPositions();
             });
             
             const historyColRef = collection(db, `${basePath}/history`);
-            onSnapshot(historyColRef, (snapshot) => {
+            const unsubHistory = onSnapshot(historyColRef, (snapshot) => {
                 const history = snapshot.docs.map(doc => doc.data());
                 history.sort((a,b) => (b.closeTime?.seconds ?? 0) - (a.closeTime?.seconds ?? 0));
                 renderHistory(history);
             });
 
-            // Show the main app content
-            loadingOverlay.classList.add('hidden');
-            appContent.classList.remove('hidden');
+            unsubscribeListeners.push(unsubAccount, unsubPositions, unsubHistory);
 
-            // Defer chart initialization until after the next browser paint
+            appContent.classList.remove('hidden');
+            loadingOverlay.classList.add('hidden');
+
             requestAnimationFrame(() => {
-                // Initialize chart and simulation now that the UI is visible
                 try {
                     initChart();
                     generateInitialChartData(instrumentSelect.value);
-                    if (marketIntervalId) clearInterval(marketIntervalId); // Clear previous interval if any
+                    if (marketIntervalId) clearInterval(marketIntervalId);
                     marketIntervalId = setInterval(simulateMarket, 1500);
                 } catch (e) {
                     console.error("Chart initialization failed:", e);
@@ -502,141 +371,119 @@
             });
         }
         
-        async function openTrade(type) {
-            if (!userId) {
-                showModal('Error', 'User not authenticated.');
-                return;
-            }
-            
-            const symbol = instrumentSelect.value;
-            const volume = parseFloat(lotSizeInput.value);
-            
-            if (isNaN(volume) || volume <= 0) {
-                showModal('Invalid Input', 'Please enter a valid lot size.');
-                return;
-            }
+        // --- Auth Event Handlers ---
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            authErrorEl.textContent = '';
 
-            const tradeData = {
-                symbol,
-                type,
-                volume,
-                openPrice: type === 'BUY' ? marketData[symbol].ask : marketData[symbol].bid,
-                openTime: serverTimestamp()
-            };
+            signInWithEmailAndPassword(auth, email, password)
+                .catch(error => {
+                    authErrorEl.textContent = error.message;
+                });
+        });
 
-            const basePath = `/artifacts/${appId}/users/${userId}`;
-            const positionsColRef = collection(db, `${basePath}/positions`);
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('register-email').value;
+            const password = document.getElementById('register-password').value;
+            authErrorEl.textContent = '';
+
             try {
-                await addDoc(positionsColRef, tradeData);
-                showModal('Success', `${type} order for ${volume} lot(s) of ${symbol} has been placed.`);
-            } catch (error) {
-                console.error("Error opening trade: ", error);
-                showModal('Error', 'Could not open the trade. Please try again.');
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+
+                // Create initial account document with $1000 balance
+                const basePath = `/artifacts/${appId}/users/${user.uid}`;
+                const accountDocRef = doc(db, `${basePath}/account/info`);
+                await setDoc(accountDocRef, { balance: 1000, equity: 1000 });
+                
+            } catch(error) {
+                authErrorEl.textContent = error.message;
             }
-        }
+        });
         
+        logoutButton.addEventListener('click', () => {
+            signOut(auth);
+        });
+
+        showRegisterBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            loginForm.classList.add('hidden');
+            registerForm.classList.remove('hidden');
+            authErrorEl.textContent = '';
+        });
+
+        showLoginBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            registerForm.classList.add('hidden');
+            loginForm.classList.remove('hidden');
+            authErrorEl.textContent = '';
+        });
+
+        // --- Main Auth State Listener ---
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // User is signed in
+                setupAppForUser(user);
+            } else {
+                // User is signed out
+                teardownApp();
+            }
+        });
+        
+        // --- Core Application Functions ---
+        function initChart() {
+            if (!window.LightweightCharts) { console.error("LightweightCharts library not loaded."); return; }
+            if (!chartContainer || chartContainer.clientWidth === 0 || chartContainer.clientHeight === 0) { console.error("Chart container not ready or has no dimensions."); return; }
+            const { createChart, CrosshairMode } = window.LightweightCharts;
+            chart = createChart(chartContainer, { width: chartContainer.clientWidth, height: chartContainer.clientHeight, layout: { backgroundColor: '#1f2937', textColor: 'rgba(255, 255, 255, 0.9)', }, grid: { vertLines: { color: '#374151' }, horzLines: { color: '#374151' }, }, crosshair: { mode: CrosshairMode.Normal }, rightPriceScale: { borderColor: '#4b5563' }, timeScale: { borderColor: '#4b5563' }, });
+            candlestickSeries = chart.addCandlestickSeries({ upColor: '#22c55e', downColor: '#ef4444', borderDownColor: '#ef4444', borderUpColor: '#22c55e', wickDownColor: '#ef4444', wickUpColor: '#22c55e', });
+            new ResizeObserver(entries => { if (entries.length === 0 || entries[0].target !== chartContainer) { return; } const newRect = entries[0].contentRect; chart.applyOptions({ width: newRect.width, height: newRect.height }); }).observe(chartContainer);
+        }
+        function generateInitialChartData(symbol) {
+            if (!candlestickSeries) return;
+            const data = []; let price = marketData[symbol].bid; const isJPY = symbol.includes('JPY'); const pips = isJPY ? 0.01 : 0.0001; const now = Math.floor(Date.now() / 1000); let currentTime = now - (150 * 60);
+            for (let i = 0; i < 150; i++) { const open = price; const close = open + (Math.random() - 0.5) * pips * 20; const high = Math.max(open, close) + Math.random() * pips * 10; const low = Math.min(open, close) - Math.random() * pips * 10; price = close; data.push({ time: currentTime, open, high, low, close, }); currentTime += 60; }
+            currentChartData = data; candlestickSeries.setData(currentChartData);
+        }
+        const formatCurrency = (value) => `$${value.toFixed(2)}`;
+        function renderMarketWatch() {
+            marketWatchList.innerHTML = '';
+            for (const symbol in marketData) { const data = marketData[symbol]; const priceChangeClass = data.bid > data.lastBid ? 'price-up' : (data.bid < data.lastBid ? 'price-down' : ''); const element = document.createElement('div'); element.className = 'p-2 rounded-md bg-gray-700/50 flex justify-between items-center cursor-pointer hover:bg-gray-600/50'; element.innerHTML = `<div><div class="font-bold">${symbol}</div><div class="text-xs text-gray-400">${symbol === 'XAUUSD' ? 'Gold' : 'Forex'}</div></div><div class="text-right font-mono ${priceChangeClass}"><div>${data.bid.toFixed(symbol === 'XAUUSD' || symbol === 'USDJPY' ? 2 : 4)}</div></div>`; element.addEventListener('click', () => { instrumentSelect.value = symbol; instrumentSelect.dispatchEvent(new Event('change')); }); marketWatchList.appendChild(element); }
+        }
+        function renderAccountInfo(totalPL) {
+            accountInfo.equity = accountInfo.balance + totalPL; balanceValueEl.textContent = formatCurrency(accountInfo.balance); equityValueEl.textContent = formatCurrency(accountInfo.equity); plValueEl.textContent = formatCurrency(totalPL); plValueEl.className = `font-mono font-semibold ${totalPL >= 0 ? 'price-up' : 'price-down'}`;
+        }
+        function renderOpenPositions() {
+            openPositionsBody.innerHTML = ''; let totalPL = 0; if (openPositions.length === 0) { openPositionsBody.innerHTML = `<tr><td colspan="7" class="text-center p-4 text-gray-500">No open positions.</td></tr>`; }
+            openPositions.forEach(pos => { const currentPrice = pos.type === 'BUY' ? marketData[pos.symbol].bid : marketData[pos.symbol].ask; const priceDiff = pos.type === 'BUY' ? (currentPrice - pos.openPrice) : (pos.openPrice - currentPrice); const pointValue = pos.symbol.includes('JPY') ? 1000 : 100000; const profit = priceDiff * pos.volume * pointValue; totalPL += profit; const profitClass = profit >= 0 ? 'price-up' : 'price-down'; const row = document.createElement('tr'); row.className = 'hover:bg-gray-700/50'; row.innerHTML = `<td class="p-2 font-semibold">${pos.symbol}</td><td class="p-2 font-semibold ${pos.type === 'BUY' ? 'text-green-500' : 'text-red-500'}">${pos.type}</td><td class="p-2">${pos.volume}</td><td class="p-2 font-mono">${pos.openPrice.toFixed(pos.symbol.includes('JPY') ? 2 : 4)}</td><td class="p-2 font-mono">${currentPrice.toFixed(pos.symbol.includes('JPY') ? 2 : 4)}</td><td class="p-2 font-mono font-semibold ${profitClass}">${formatCurrency(profit)}</td><td class="p-2"><button data-id="${pos.id}" class="close-btn text-xs bg-gray-600 hover:bg-red-600 px-2 py-1 rounded">Close</button></td>`; openPositionsBody.appendChild(row); });
+            positionsCountEl.textContent = openPositions.length; renderAccountInfo(totalPL);
+        }
+        function renderHistory(history) {
+            historyBody.innerHTML = ''; if (history.length === 0) { historyBody.innerHTML = `<tr><td colspan="6" class="text-center p-4 text-gray-500">No trading history.</td></tr>`; }
+            history.forEach(trade => { const profitClass = trade.profit >= 0 ? 'price-up' : 'price-down'; const row = document.createElement('tr'); row.innerHTML = `<td class="p-2 font-semibold">${trade.symbol}</td><td class="p-2 font-semibold ${trade.type === 'BUY' ? 'text-green-500' : 'text-red-500'}">${trade.type}</td><td class="p-2">${trade.volume}</td><td class="p-2 font-mono">${trade.openPrice.toFixed(trade.symbol.includes('JPY') ? 2 : 4)}</td><td class="p-2 font-mono">${trade.closePrice.toFixed(trade.symbol.includes('JPY') ? 2 : 4)}</td><td class="p-2 font-mono font-semibold ${profitClass}">${formatCurrency(trade.profit)}</td>`; historyBody.appendChild(row); });
+        }
+        function simulateMarket() {
+            for (const symbol in marketData) { const data = marketData[symbol]; data.lastBid = data.bid; const pips = symbol.includes('JPY') ? 0.01 : 0.0001; const volatility = pips * 5; const change = (Math.random() - 0.5) * volatility; data.bid += change; data.ask = data.bid + (pips * (2 + Math.random() * 2)); }
+            renderMarketWatch(); renderOpenPositions();
+            if (candlestickSeries && currentChartData.length > 0) { const selectedSymbol = instrumentSelect.value; const newPrice = marketData[selectedSymbol].bid; let lastCandle = currentChartData[currentChartData.length - 1]; lastCandle.close = newPrice; lastCandle.high = Math.max(lastCandle.high, newPrice); lastCandle.low = Math.min(lastCandle.low, newPrice); candlestickSeries.update(lastCandle); }
+        }
+        async function openTrade(type) {
+            if (!userId) { showModal('Error', 'User not authenticated.'); return; } const symbol = instrumentSelect.value; const volume = parseFloat(lotSizeInput.value); if (isNaN(volume) || volume <= 0) { showModal('Invalid Input', 'Please enter a valid lot size.'); return; } const tradeData = { symbol, type, volume, openPrice: type === 'BUY' ? marketData[symbol].ask : marketData[symbol].bid, openTime: serverTimestamp() }; const basePath = `/artifacts/${appId}/users/${userId}`; const positionsColRef = collection(db, `${basePath}/positions`); try { await addDoc(positionsColRef, tradeData); showModal('Success', `${type} order for ${volume} lot(s) of ${symbol} has been placed.`); } catch (error) { console.error("Error opening trade: ", error); showModal('Error', 'Could not open the trade. Please try again.'); }
+        }
         async function closePosition(positionId) {
-             if (!userId) {
-                showModal('Error', 'User not authenticated.');
-                return;
-            }
-            
-            const pos = openPositions.find(p => p.id === positionId);
-            if (!pos) return;
-
-            const closePrice = pos.type === 'BUY' ? marketData[pos.symbol].bid : marketData[pos.symbol].ask;
-            const priceDiff = pos.type === 'BUY' ? (closePrice - pos.openPrice) : (pos.openPrice - closePrice);
-            const pointValue = pos.symbol.includes('JPY') ? 1000 : 100000;
-            const profit = priceDiff * pos.volume * pointValue;
-            
-            const historyData = {
-                ...pos,
-                closePrice,
-                closeTime: serverTimestamp(),
-                profit
-            };
-            delete historyData.id;
-
-            const basePath = `/artifacts/${appId}/users/${userId}`;
-            const historyColRef = collection(db, `${basePath}/history`);
-            const positionDocRef = doc(db, `${basePath}/positions/${positionId}`);
-            const accountDocRef = doc(db, `${basePath}/account/info`);
-            
-            try {
-                await addDoc(historyColRef, historyData);
-                await deleteDoc(positionDocRef);
-                const newBalance = accountInfo.balance + profit;
-                await setDoc(accountDocRef, { balance: newBalance, equity: newBalance });
-                showModal('Position Closed', `Position for ${pos.symbol} closed with a profit of ${formatCurrency(profit)}.`);
-            } catch (error) {
-                console.error("Error closing position: ", error);
-                showModal('Error', 'Could not close the position. Please try again.');
-            }
+            if (!userId) { showModal('Error', 'User not authenticated.'); return; } const pos = openPositions.find(p => p.id === positionId); if (!pos) return; const closePrice = pos.type === 'BUY' ? marketData[pos.symbol].bid : marketData[pos.symbol].ask; const priceDiff = pos.type === 'BUY' ? (closePrice - pos.openPrice) : (pos.openPrice - closePrice); const pointValue = pos.symbol.includes('JPY') ? 1000 : 100000; const profit = priceDiff * pos.volume * pointValue; const historyData = { ...pos, closePrice, closeTime: serverTimestamp(), profit }; delete historyData.id; const basePath = `/artifacts/${appId}/users/${userId}`; const historyColRef = collection(db, `${basePath}/history`); const positionDocRef = doc(db, `${basePath}/positions/${positionId}`); const accountDocRef = doc(db, `${basePath}/account/info`); try { await addDoc(historyColRef, historyData); await deleteDoc(positionDocRef); const newBalance = accountInfo.balance + profit; await setDoc(accountDocRef, { balance: newBalance }, { merge: true }); showModal('Position Closed', `Position for ${pos.symbol} closed with a profit of ${formatCurrency(profit)}.`); } catch (error) { console.error("Error closing position: ", error); showModal('Error', 'Could not close the position. Please try again.'); }
         }
 
         // --- Event Listeners ---
         buyButton.addEventListener('click', () => openTrade('BUY'));
         sellButton.addEventListener('click', () => openTrade('SELL'));
-
-        openPositionsBody.addEventListener('click', (e) => {
-            if (e.target && e.target.classList.contains('close-btn')) {
-                const positionId = e.target.getAttribute('data-id');
-                closePosition(positionId);
-            }
-        });
-        
-        instrumentSelect.addEventListener('change', (e) => {
-            generateInitialChartData(e.target.value);
-        });
-
-        tabPositions.addEventListener('click', () => {
-            positionsContent.classList.remove('hidden');
-            historyContent.classList.add('hidden');
-            tabPositions.classList.add('border-blue-500', 'text-white');
-            tabPositions.classList.remove('text-gray-400');
-            tabHistory.classList.remove('border-blue-500', 'text-white');
-            tabHistory.classList.add('text-gray-400');
-        });
-
-        tabHistory.addEventListener('click', () => {
-            historyContent.classList.remove('hidden');
-            positionsContent.classList.add('hidden');
-            tabHistory.classList.add('border-blue-500', 'text-white');
-            tabHistory.classList.remove('text-gray-400');
-            tabPositions.classList.remove('border-blue-500', 'text-white');
-            tabPositions.classList.add('text-gray-400');
-        });
-
-        // --- Initialization ---
-        function startApp() {
-            if (auth) {
-                onAuthStateChanged(auth, async (user) => {
-                    if (user) {
-                        if (isAppInitialized) return;
-                        isAppInitialized = true;
-
-                        userId = user.uid;
-                        userIdEl.textContent = userId;
-                        await setupFirestoreListeners(userId);
-
-                    } else {
-                        try {
-                            if (initialAuthToken) {
-                                await signInWithCustomToken(auth, initialAuthToken);
-                            } else {
-                                await signInAnonymously(auth);
-                            }
-                        } catch (error) {
-                            console.error("Authentication failed:", error);
-                            loadingOverlay.innerHTML = `<div class="text-center"><h2 class="text-xl text-red-500">Authentication Failed</h2><p class="text-gray-400">${error.message}</p></div>`;
-                        }
-                    }
-                });
-            }
-        }
-        
-        startApp();
-
+        openPositionsBody.addEventListener('click', (e) => { if (e.target && e.target.classList.contains('close-btn')) { const positionId = e.target.getAttribute('data-id'); closePosition(positionId); } });
+        instrumentSelect.addEventListener('change', (e) => { if(candlestickSeries) generateInitialChartData(e.target.value); });
+        tabPositions.addEventListener('click', () => { positionsContent.classList.remove('hidden'); historyContent.classList.add('hidden'); tabPositions.classList.add('border-blue-500', 'text-white'); tabPositions.classList.remove('text-gray-400'); tabHistory.classList.remove('border-blue-500', 'text-white'); tabHistory.classList.add('text-gray-400'); });
+        tabHistory.addEventListener('click', () => { historyContent.classList.remove('hidden'); positionsContent.classList.add('hidden'); tabHistory.classList.add('border-blue-500', 'text-white'); tabHistory.classList.remove('text-gray-400'); tabPositions.classList.remove('border-blue-500', 'text-white'); tabPositions.classList.add('text-gray-400'); });
     </script>
 </body>
 </html>
