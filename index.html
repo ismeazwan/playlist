@@ -207,7 +207,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, collection, addDoc, setDoc, deleteDoc, serverTimestamp, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, onSnapshot, collection, addDoc, setDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Config & App ID ---
         let firebaseConfig;
@@ -251,7 +251,7 @@
         };
         let openPositions = [];
         let accountInfo = { balance: 0, equity: 0 };
-        let chart, candlestickSeries, currentChartData = [];
+        let chart, candlestickSeries, currentChartData = [], chartResizeObserver = null;
         let marketIntervalId = null;
         
         // --- DOM Elements ---
@@ -309,28 +309,27 @@
         }
 
         function teardownApp() {
-            // Unsubscribe from all Firestore listeners
             unsubscribeListeners.forEach(unsub => unsub());
             unsubscribeListeners = [];
             
-            // Stop market simulation
             if (marketIntervalId) clearInterval(marketIntervalId);
             marketIntervalId = null;
 
-            // Properly remove the chart instance
+            if (chartResizeObserver) {
+                chartResizeObserver.disconnect();
+                chartResizeObserver = null;
+            }
             if (chart) {
                 chart.remove();
                 chart = null;
                 candlestickSeries = null;
             }
-            chartContainer.innerHTML = ''; // Ensure the container is empty
+            chartContainer.innerHTML = '';
 
-            // Reset state
             userId = null;
             openPositions = [];
             accountInfo = { balance: 0, equity: 0 };
 
-            // Show login screen
             appContent.classList.add('hidden');
             authContainer.classList.remove('hidden');
             loadingOverlay.classList.add('hidden');
@@ -346,12 +345,16 @@
                     accountInfo = docSnap.data();
                     renderOpenPositions();
                 }
+            }, (error) => {
+                console.error("Account listener error:", error);
             });
 
             const positionsColRef = collection(db, `${basePath}/positions`);
             const unsubPositions = onSnapshot(positionsColRef, (snapshot) => {
                 openPositions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 renderOpenPositions();
+            }, (error) => {
+                console.error("Positions listener error:", error);
             });
             
             const historyColRef = collection(db, `${basePath}/history`);
@@ -359,6 +362,8 @@
                 const history = snapshot.docs.map(doc => doc.data());
                 history.sort((a,b) => (b.closeTime?.seconds ?? 0) - (a.closeTime?.seconds ?? 0));
                 renderHistory(history);
+            }, (error) => {
+                console.error("History listener error:", error);
             });
 
             unsubscribeListeners.push(unsubAccount, unsubPositions, unsubHistory);
@@ -384,24 +389,20 @@
                 showModal('Error', 'User not authenticated.');
                 return;
             }
-            
             const symbol = instrumentSelect.value;
             const volume = parseFloat(lotSizeInput.value);
-            
             if (isNaN(volume) || volume <= 0) {
                 showModal('Invalid Input', 'Please enter a valid lot size.');
                 return;
             }
-
             const tradeData = {
-                userId: userId, // Added for security rule validation
+                userId: userId,
                 symbol,
                 type,
                 volume,
                 openPrice: type === 'BUY' ? marketData[symbol].ask : marketData[symbol].bid,
                 openTime: serverTimestamp()
             };
-
             const basePath = `/artifacts/${appId}/users/${userId}`;
             const positionsColRef = collection(db, `${basePath}/positions`);
             try {
@@ -418,15 +419,12 @@
                 showModal('Error', 'User not authenticated.');
                 return;
             }
-            
             const pos = openPositions.find(p => p.id === positionId);
             if (!pos) return;
-
             const closePrice = pos.type === 'BUY' ? marketData[pos.symbol].bid : marketData[pos.symbol].ask;
-            const priceDiff = pos.type === 'BUY' ? (closePrice - pos.openPrice) : (pos.openPrice - closePrice);
+            const priceDiff = pos.type === 'BUY' ? (closePrice - pos.openPrice) : (pos.openPrice - currentPrice);
             const pointValue = pos.symbol.includes('JPY') ? 1000 : 100000;
             const profit = priceDiff * pos.volume * pointValue;
-            
             const historyData = {
                 ...pos,
                 closePrice,
@@ -434,17 +432,15 @@
                 profit
             };
             delete historyData.id;
-
             const basePath = `/artifacts/${appId}/users/${userId}`;
             const historyColRef = collection(db, `${basePath}/history`);
             const positionDocRef = doc(db, `${basePath}/positions/${positionId}`);
             const accountDocRef = doc(db, `${basePath}/account/info`);
-            
             try {
                 await addDoc(historyColRef, historyData);
                 await deleteDoc(positionDocRef);
                 const newBalance = accountInfo.balance + profit;
-                await updateDoc(accountDocRef, { balance: newBalance }); // Use updateDoc for safety
+                await setDoc(accountDocRef, { balance: newBalance }, { merge: true });
                 showModal('Position Closed', `Position for ${pos.symbol} closed with a profit of ${formatCurrency(profit)}.`);
             } catch (error) {
                 console.error("Error closing position: ", error);
@@ -458,11 +454,8 @@
             const email = document.getElementById('login-email').value;
             const password = document.getElementById('login-password').value;
             authErrorEl.textContent = '';
-
             signInWithEmailAndPassword(auth, email, password)
-                .catch(error => {
-                    authErrorEl.textContent = error.message;
-                });
+                .catch(error => { authErrorEl.textContent = error.message; });
         });
 
         registerForm.addEventListener('submit', async (e) => {
@@ -470,58 +463,40 @@
             const email = document.getElementById('register-email').value;
             const password = document.getElementById('register-password').value;
             authErrorEl.textContent = '';
-
             try {
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                 const user = userCredential.user;
-
-                // Create initial account document with $1000 balance
                 const basePath = `/artifacts/${appId}/users/${user.uid}`;
                 const accountDocRef = doc(db, `${basePath}/account/info`);
-                await setDoc(accountDocRef, { balance: 1000 }); // Only store balance
-                
+                await setDoc(accountDocRef, { balance: 1000, equity: 1000 });
             } catch(error) {
                 authErrorEl.textContent = error.message;
             }
         });
         
-        logoutButton.addEventListener('click', () => {
-            signOut(auth);
-        });
-
-        showRegisterBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            loginForm.classList.add('hidden');
-            registerForm.classList.remove('hidden');
-            authErrorEl.textContent = '';
-        });
-
-        showLoginBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            registerForm.classList.add('hidden');
-            loginForm.classList.remove('hidden');
-            authErrorEl.textContent = '';
-        });
+        logoutButton.addEventListener('click', () => { signOut(auth); });
+        showRegisterBtn.addEventListener('click', (e) => { e.preventDefault(); loginForm.classList.add('hidden'); registerForm.classList.remove('hidden'); authErrorEl.textContent = ''; });
+        showLoginBtn.addEventListener('click', (e) => { e.preventDefault(); registerForm.classList.add('hidden'); loginForm.classList.remove('hidden'); authErrorEl.textContent = ''; });
 
         // --- Main Auth State Listener ---
         onAuthStateChanged(auth, (user) => {
-            if (user) {
-                // User is signed in
-                setupAppForUser(user);
-            } else {
-                // User is signed out
-                teardownApp();
-            }
+            if (user) { setupAppForUser(user); } 
+            else { teardownApp(); }
         });
         
         // --- Core Application Functions ---
         function initChart() {
             if (!window.LightweightCharts) { console.error("LightweightCharts library not loaded."); return; }
-            if (!chartContainer || chartContainer.clientWidth === 0 || chartContainer.clientHeight === 0) { console.error("Chart container not ready or has no dimensions."); return; }
+            if (!chartContainer || chartContainer.clientWidth === 0 || chartContainer.clientHeight === 0) { console.error("Chart container not ready."); return; }
             const { createChart, CrosshairMode } = window.LightweightCharts;
             chart = createChart(chartContainer, { width: chartContainer.clientWidth, height: chartContainer.clientHeight, layout: { backgroundColor: '#1f2937', textColor: 'rgba(255, 255, 255, 0.9)', }, grid: { vertLines: { color: '#374151' }, horzLines: { color: '#374151' }, }, crosshair: { mode: CrosshairMode.Normal }, rightPriceScale: { borderColor: '#4b5563' }, timeScale: { borderColor: '#4b5563' }, });
             candlestickSeries = chart.addCandlestickSeries({ upColor: '#22c55e', downColor: '#ef4444', borderDownColor: '#ef4444', borderUpColor: '#22c55e', wickDownColor: '#ef4444', wickUpColor: '#22c55e', });
-            new ResizeObserver(entries => { if (entries.length === 0 || entries[0].target !== chartContainer) { return; } const newRect = entries[0].contentRect; chart.applyOptions({ width: newRect.width, height: newRect.height }); }).observe(chartContainer);
+            chartResizeObserver = new ResizeObserver(entries => { 
+                if (entries.length === 0 || entries[0].target !== chartContainer || !chart) { return; } 
+                const newRect = entries[0].contentRect; 
+                chart.applyOptions({ width: newRect.width, height: newRect.height }); 
+            });
+            chartResizeObserver.observe(chartContainer);
         }
         function generateInitialChartData(symbol) {
             if (!candlestickSeries) return;
@@ -529,22 +504,22 @@
             for (let i = 0; i < 150; i++) { const open = price; const close = open + (Math.random() - 0.5) * pips * 20; const high = Math.max(open, close) + Math.random() * pips * 10; const low = Math.min(open, close) - Math.random() * pips * 10; price = close; data.push({ time: currentTime, open, high, low, close, }); currentTime += 60; }
             currentChartData = data; candlestickSeries.setData(currentChartData);
         }
-        const formatCurrency = (value) => `$${value.toFixed(2)}`;
+        const formatCurrency = (value) => `$${(value || 0).toFixed(2)}`;
         function renderMarketWatch() {
             marketWatchList.innerHTML = '';
             for (const symbol in marketData) { const data = marketData[symbol]; const priceChangeClass = data.bid > data.lastBid ? 'price-up' : (data.bid < data.lastBid ? 'price-down' : ''); const element = document.createElement('div'); element.className = 'p-2 rounded-md bg-gray-700/50 flex justify-between items-center cursor-pointer hover:bg-gray-600/50'; element.innerHTML = `<div><div class="font-bold">${symbol}</div><div class="text-xs text-gray-400">${symbol === 'XAUUSD' ? 'Gold' : 'Forex'}</div></div><div class="text-right font-mono ${priceChangeClass}"><div>${data.bid.toFixed(symbol === 'XAUUSD' || symbol === 'USDJPY' ? 2 : 4)}</div></div>`; element.addEventListener('click', () => { instrumentSelect.value = symbol; instrumentSelect.dispatchEvent(new Event('change')); }); marketWatchList.appendChild(element); }
         }
         function renderAccountInfo(totalPL) {
-            accountInfo.equity = accountInfo.balance + totalPL; balanceValueEl.textContent = formatCurrency(accountInfo.balance); equityValueEl.textContent = formatCurrency(accountInfo.equity); plValueEl.textContent = formatCurrency(totalPL); plValueEl.className = `font-mono font-semibold ${totalPL >= 0 ? 'price-up' : 'price-down'}`;
+            accountInfo.equity = (accountInfo.balance || 0) + totalPL; balanceValueEl.textContent = formatCurrency(accountInfo.balance); equityValueEl.textContent = formatCurrency(accountInfo.equity); plValueEl.textContent = formatCurrency(totalPL); plValueEl.className = `font-mono font-semibold ${totalPL >= 0 ? 'price-up' : 'price-down'}`;
         }
         function renderOpenPositions() {
             openPositionsBody.innerHTML = ''; let totalPL = 0; if (openPositions.length === 0) { openPositionsBody.innerHTML = `<tr><td colspan="7" class="text-center p-4 text-gray-500">No open positions.</td></tr>`; }
-            openPositions.forEach(pos => { const currentPrice = pos.type === 'BUY' ? marketData[pos.symbol].bid : marketData[pos.symbol].ask; const priceDiff = pos.type === 'BUY' ? (currentPrice - pos.openPrice) : (pos.openPrice - currentPrice); const pointValue = pos.symbol.includes('JPY') ? 1000 : 100000; const profit = priceDiff * pos.volume * pointValue; totalPL += profit; const profitClass = profit >= 0 ? 'price-up' : 'price-down'; const row = document.createElement('tr'); row.className = 'hover:bg-gray-700/50'; row.innerHTML = `<td class="p-2 font-semibold">${pos.symbol}</td><td class="p-2 font-semibold ${pos.type === 'BUY' ? 'text-green-500' : 'text-red-500'}">${pos.type}</td><td class="p-2">${pos.volume}</td><td class="p-2 font-mono">${pos.openPrice.toFixed(pos.symbol.includes('JPY') ? 2 : 4)}</td><td class="p-2 font-mono">${currentPrice.toFixed(pos.symbol.includes('JPY') ? 2 : 4)}</td><td class="p-2 font-mono font-semibold ${profitClass}">${formatCurrency(profit)}</td><td class="p-2"><button data-id="${pos.id}" class="close-btn text-xs bg-gray-600 hover:bg-red-600 px-2 py-1 rounded">Close</button></td>`; openPositionsBody.appendChild(row); });
+            openPositions.forEach(pos => { const currentPrice = pos.type === 'BUY' ? marketData[pos.symbol].bid : marketData[pos.symbol].ask; const priceDiff = pos.type === 'BUY' ? (currentPrice - pos.openPrice) : (pos.openPrice - currentPrice); const pointValue = pos.symbol.includes('JPY') ? 1000 : 100000; const profit = priceDiff * pos.volume * pointValue; totalPL += profit; const profitClass = profit >= 0 ? 'price-up' : 'price-down'; const row = document.createElement('tr'); row.className = 'hover:bg-gray-700/50'; row.innerHTML = `<td class="p-2 font-semibold">${pos.symbol}</td><td class="p-2 font-semibold ${pos.type === 'BUY' ? 'text-green-500' : 'text-red-500'}">${pos.type}</td><td class="p-2">${pos.volume}</td><td class="p-2 font-mono">${(pos.openPrice || 0).toFixed(pos.symbol.includes('JPY') ? 2 : 4)}</td><td class="p-2 font-mono">${currentPrice.toFixed(pos.symbol.includes('JPY') ? 2 : 4)}</td><td class="p-2 font-mono font-semibold ${profitClass}">${formatCurrency(profit)}</td><td class="p-2"><button data-id="${pos.id}" class="close-btn text-xs bg-gray-600 hover:bg-red-600 px-2 py-1 rounded">Close</button></td>`; openPositionsBody.appendChild(row); });
             positionsCountEl.textContent = openPositions.length; renderAccountInfo(totalPL);
         }
         function renderHistory(history) {
             historyBody.innerHTML = ''; if (history.length === 0) { historyBody.innerHTML = `<tr><td colspan="6" class="text-center p-4 text-gray-500">No trading history.</td></tr>`; }
-            history.forEach(trade => { const profitClass = trade.profit >= 0 ? 'price-up' : 'price-down'; const row = document.createElement('tr'); row.innerHTML = `<td class="p-2 font-semibold">${trade.symbol}</td><td class="p-2 font-semibold ${trade.type === 'BUY' ? 'text-green-500' : 'text-red-500'}">${trade.type}</td><td class="p-2">${trade.volume}</td><td class="p-2 font-mono">${trade.openPrice.toFixed(trade.symbol.includes('JPY') ? 2 : 4)}</td><td class="p-2 font-mono">${trade.closePrice.toFixed(trade.symbol.includes('JPY') ? 2 : 4)}</td><td class="p-2 font-mono font-semibold ${profitClass}">${formatCurrency(trade.profit)}</td>`; historyBody.appendChild(row); });
+            history.forEach(trade => { const profitClass = trade.profit >= 0 ? 'price-up' : 'price-down'; const row = document.createElement('tr'); row.innerHTML = `<td class="p-2 font-semibold">${trade.symbol}</td><td class="p-2 font-semibold ${trade.type === 'BUY' ? 'text-green-500' : 'text-red-500'}">${trade.type}</td><td class="p-2">${trade.volume}</td><td class="p-2 font-mono">${(trade.openPrice || 0).toFixed(trade.symbol.includes('JPY') ? 2 : 4)}</td><td class="p-2 font-mono">${(trade.closePrice || 0).toFixed(trade.symbol.includes('JPY') ? 2 : 4)}</td><td class="p-2 font-mono font-semibold ${profitClass}">${formatCurrency(trade.profit)}</td>`; historyBody.appendChild(row); });
         }
         function simulateMarket() {
             for (const symbol in marketData) { const data = marketData[symbol]; data.lastBid = data.bid; const pips = symbol.includes('JPY') ? 0.01 : 0.0001; const volatility = pips * 5; const change = (Math.random() - 0.5) * volatility; data.bid += change; data.ask = data.bid + (pips * (2 + Math.random() * 2)); }
