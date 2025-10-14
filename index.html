@@ -228,8 +228,6 @@
             firebaseConfig = hardcodedConfig;
         }
 
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
         // --- Initialize Firebase ---
         let app, db, auth;
         if (firebaseConfig && firebaseConfig.apiKey) {
@@ -337,7 +335,7 @@
 
         // --- Firebase Logic ---
         function setupFirestoreListeners(uid) {
-            const basePath = `/artifacts/${appId}/users/${uid}`;
+            const basePath = `/users/${uid}`; // SIMPLIFIED PATH
             
             const accountDocRef = doc(db, `${basePath}/account/info`);
             const unsubAccount = onSnapshot(accountDocRef, (docSnap) => {
@@ -403,7 +401,7 @@
                 openPrice: type === 'BUY' ? marketData[symbol].ask : marketData[symbol].bid,
                 openTime: serverTimestamp()
             };
-            const basePath = `/artifacts/${appId}/users/${userId}`;
+            const basePath = `/users/${userId}`; // SIMPLIFIED PATH
             const positionsColRef = collection(db, `${basePath}/positions`);
             try {
                 await addDoc(positionsColRef, tradeData);
@@ -432,7 +430,7 @@
                 profit
             };
             delete historyData.id;
-            const basePath = `/artifacts/${appId}/users/${userId}`;
+            const basePath = `/users/${userId}`; // SIMPLIFIED PATH
             const historyColRef = collection(db, `${basePath}/history`);
             const positionDocRef = doc(db, `${basePath}/positions/${positionId}`);
             const accountDocRef = doc(db, `${basePath}/account/info`);
@@ -466,7 +464,7 @@
             try {
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                 const user = userCredential.user;
-                const basePath = `/artifacts/${appId}/users/${user.uid}`;
+                const basePath = `/users/${user.uid}`; // SIMPLIFIED PATH
                 const accountDocRef = doc(db, `${basePath}/account/info`);
                 await setDoc(accountDocRef, { balance: 1000, userId: user.uid });
             } catch(error) {
