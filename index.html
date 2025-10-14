@@ -167,8 +167,28 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, onSnapshot, collection, addDoc, setDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Firebase Config, App ID, and Initial Auth Token (from environment) ---
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        // --- Firebase Config, App ID, and Initial Auth Token ---
+        let firebaseConfig;
+        
+        // Fallback config if environment variable is not available
+        const hardcodedConfig = {
+          apiKey: "AIzaSyC6Es1HpmWqmNSaACoKG2wYPq_dBkyFYSs",
+          authDomain: "database-forex.firebaseapp.com",
+          projectId: "database-forex",
+          storageBucket: "database-forex.appspot.com", // Corrected standard format
+          messagingSenderId: "780234110549",
+          appId: "1:780234110549:web:b72051f7e28ea2ec3506dc",
+          measurementId: "G-LWKQTY831W"
+        };
+        
+        // Try to use environment variable first, otherwise use hardcoded fallback
+        if (typeof __firebase_config !== 'undefined' && __firebase_config !== '{}') {
+            firebaseConfig = JSON.parse(__firebase_config);
+        } else {
+            console.warn("Firebase environment variable not found. Using hardcoded config as a fallback.");
+            firebaseConfig = hardcodedConfig;
+        }
+
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
@@ -178,7 +198,7 @@
         let db;
         let auth;
         
-        if (firebaseConfig.apiKey) {
+        if (firebaseConfig && firebaseConfig.apiKey) {
             app = initializeApp(firebaseConfig);
             db = getFirestore(app);
             auth = getAuth(app);
