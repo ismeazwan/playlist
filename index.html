@@ -213,12 +213,7 @@
 
             // --- Global State & Config ---
             const LEVERAGE = 100;
-            const CONTRACT_SIZES = {
-                'EURUSD': 100000,
-                'GBPUSD': 100000,
-                'USDJPY': 100000,
-                'XAUUSD': 100, // Ounces
-            };
+            const CONTRACT_SIZES = { 'EURUSD': 100000, 'GBPUSD': 100000, 'USDJPY': 100000, 'XAUUSD': 100 };
             let marketData = {
                 'EURUSD': { bid: 1.0850, ask: 1.0852, lastBid: 1.0850 },
                 'XAUUSD': { bid: 2350.50, ask: 2350.90, lastBid: 2350.50 },
@@ -287,27 +282,35 @@
 
             function loadState() {
                 const savedState = localStorage.getItem('tradingAppState');
+                let state = {};
                 if (savedState) {
-                    const state = JSON.parse(savedState);
-                    openPositions = state.openPositions || [];
-                    history = state.history || [];
-                    accountInfo = state.accountInfo || { balance: 10000, equity: 10000 };
-                    if (state.fullMarketHistory && Object.keys(state.fullMarketHistory).length > 0) {
-                        fullMarketHistory = state.fullMarketHistory;
-                    } else {
-                        fullMarketHistory = {};
-                    }
+                    try { state = JSON.parse(savedState); } catch (e) { console.error("Could not parse state, resetting.", e); state = {}; }
+                }
+
+                openPositions = state.openPositions || [];
+                history = state.history || [];
+                
+                if (state.accountInfo && state.accountInfo.balance !== undefined) {
+                    accountInfo = state.accountInfo;
                 } else {
-                    openPositions = [];
-                    history = [];
                     accountInfo = { balance: 10000, equity: 10000 };
+                }
+
+                if (state.fullMarketHistory && Object.keys(state.fullMarketHistory).length > 0) {
+                    fullMarketHistory = state.fullMarketHistory;
+                } else {
                     fullMarketHistory = {};
                 }
             }
             
             // --- Core Application Functions ---
             function initChart() { if (!window.LightweightCharts) { console.error("Library not loaded."); return; } if (!chartContainer || chartContainer.clientWidth === 0) { console.error("Chart container not ready."); return; } const { createChart, CrosshairMode } = window.LightweightCharts; chart = createChart(chartContainer, { width: chartContainer.clientWidth, height: chartContainer.clientHeight, layout: { backgroundColor: '#1f2937', textColor: 'rgba(255, 255, 255, 0.9)' }, grid: { vertLines: { color: '#374151' }, horzLines: { color: '#374151' } }, crosshair: { mode: CrosshairMode.Normal }, rightPriceScale: { borderColor: '#4b5563' }, timeScale: { borderColor: '#4b5563', timeVisible: true, secondsVisible: false } }); setChartType(currentChartType); chartResizeObserver = new ResizeObserver(entries => { if (entries.length === 0 || !chart) { return; } const newRect = entries[0].contentRect; chart.applyOptions({ width: newRect.width, height: newRect.height }); }); chartResizeObserver.observe(chartContainer); }
-            function setChartType(type) { if (mainSeries) { chart.removeSeries(mainSeries); mainSeries = null; } switch(type) { case 'bar': mainSeries = chart.addBarSeries({ upColor: '#22c55e', downColor: '#ef4444' }); break; case 'line': mainSeries = chart.addLineSeries({ color: '#3b82f6' }); break; case 'candlestick': default: mainSeries = chart.addCandlestickSeries({ upColor: '#22c55e', downColor: '#ef4444', borderDownColor: '#ef4444', borderUpColor: '#22c55e', wickDownColor: '#ef4444', wickUpColor: '#22c55e' }); break; } currentChartType = type; loadChartData(instrumentSelect.value, currentInterval); }
+            
+            function clearAllPriceLineReferences() {
+                openPositions.forEach(pos => pos.priceLine = null);
+            }
+            
+            function setChartType(type) { if (mainSeries) { chart.removeSeries(mainSeries); mainSeries = null; clearAllPriceLineReferences(); } switch(type) { case 'bar': mainSeries = chart.addBarSeries({ upColor: '#22c55e', downColor: '#ef4444' }); break; case 'line': mainSeries = chart.addLineSeries({ color: '#3b82f6' }); break; case 'candlestick': default: mainSeries = chart.addCandlestickSeries({ upColor: '#22c55e', downColor: '#ef4444', borderDownColor: '#ef4444', borderUpColor: '#22c55e', wickDownColor: '#ef4444', wickUpColor: '#22c55e' }); break; } currentChartType = type; loadChartData(instrumentSelect.value, currentInterval); }
             function calculateSMA(data, period) { let result = []; for (let i = 0; i < data.length; i++) { if (i < period - 1) { result.push({ time: data[i].time }); } else { let sum = 0; for (let j = 0; j < period; j++) { sum += data[i - j].close; } result.push({ time: data[i].time, value: sum / period }); } } return result; }
             function updateMA() { if (!maToggle.checked) { if (maSeries) { chart.removeSeries(maSeries); maSeries = null; } return; } if (!maSeries) { maSeries = chart.addLineSeries({ color: 'rgba(255, 204, 0, 1)', lineWidth: 2, crosshairMarkerVisible: false, lastValueVisible: false, priceLineVisible: false, }); } const maData = calculateSMA(currentChartData.slice(-200), MA_PERIOD); maSeries.setData(maData); }
             function preGenerateFullHistory() { for(const symbol in marketData) { let seed = symbol.charCodeAt(0) + symbol.charCodeAt(1); const data = []; let price = { 'EURUSD': 1.0850, 'XAUUSD': 2350.50, 'GBPUSD': 1.2730, 'USDJPY': 157.10 }[symbol]; const isJPY = symbol.includes('JPY'); const pips = isJPY ? 0.01 : 0.0001; const now = Math.floor(new Date('2025-10-14T00:00:00Z').getTime() / 1000); let currentTime = Math.floor((now - (TOTAL_HISTORY_LENGTH * 60)) / 60) * 60; for (let i = 0; i < TOTAL_HISTORY_LENGTH; i++) { const open = price; const close = open + (seededRandom(seed++) - 0.5) * pips * 20; const high = Math.max(open, close) + seededRandom(seed++) * pips * 10; const low = Math.min(open, close) - seededRandom(seed++) * pips * 10; price = close; data.push({ time: currentTime, open, high, low, close }); currentTime += 60; } fullMarketHistory[symbol] = data; } }
@@ -321,8 +324,8 @@
             function checkSLTP() { /* ... unchanged ... */ }
             function simulateMarket() { playbackIndex++; if (playbackIndex >= TOTAL_HISTORY_LENGTH) { playbackIndex = 150; } for (const symbol in marketData) { const data = marketData[symbol]; const nextCandle = fullMarketHistory[symbol][playbackIndex]; if (!nextCandle) continue; data.lastBid = data.bid; data.bid = nextCandle.close; const pips = symbol.includes('JPY') ? 0.01 : 0.0001; data.ask = data.bid + (pips * (1.5 + seededRandom(playbackIndex + symbol.charCodeAt(0)))); } renderMarketWatch(); renderOpenPositions(); checkSLTP(); if (mainSeries && currentChartData.length > 0) { const selectedSymbol = instrumentSelect.value; const aggregatedHistory = currentChartData; if (playbackIndex < aggregatedHistory.length) { const nextCandle = aggregatedHistory[playbackIndex]; if(nextCandle) { const displayPoint = currentChartType === 'line' ? {time: nextCandle.time, value: nextCandle.close} : nextCandle; mainSeries.update(displayPoint); updateMA(); } } } }
             function drawEntryLine(position) { if (!mainSeries) return null; const { LineStyle } = window.LightweightCharts; return mainSeries.createPriceLine({ price: position.openPrice, color: position.type === 'BUY' ? '#22c55e' : '#ef4444', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: `${position.type} ${position.volume}`, }); }
-            function redrawAllEntryLines() { openPositions.forEach(pos => { if (pos.priceLine) { mainSeries.removePriceLine(pos.priceLine); pos.priceLine = null; } }); const currentSymbol = instrumentSelect.value; openPositions.forEach(pos => { if (pos.symbol === currentSymbol) { pos.priceLine = drawEntryLine(pos); } }); }
-            function openTrade(type) { const symbol = instrumentSelect.value; const volume = parseFloat(lotSizeInput.value); const stopLoss = parseFloat(stopLossInput.value) || 0; const takeProfit = parseFloat(takeProfitInput.value) || 0; if (isNaN(volume) || volume <= 0) { showModal('Invalid Input', 'Please enter a valid lot size.'); return; } const openPrice = type === 'BUY' ? marketData[symbol].ask : marketData[symbol].bid; const requiredMargin = (CONTRACT_SIZES[symbol] * volume * openPrice) / LEVERAGE; const marginUsed = openPositions.reduce((sum, pos) => sum + (CONTRACT_SIZES[pos.symbol] * pos.volume * pos.openPrice) / LEVERAGE, 0); const freeMargin = accountInfo.equity - marginUsed; if (requiredMargin > freeMargin) { showModal('Order Rejected', 'Not enough free margin to open this position.'); return; } if (type === 'BUY') { if (stopLoss > 0 && stopLoss >= openPrice) { showModal('Invalid SL/TP', 'For a BUY order, Stop Loss must be below the open price.'); return; } if (takeProfit > 0 && takeProfit <= openPrice) { showModal('Invalid SL/TP', 'For a BUY order, Take Profit must be above the open price.'); return; } } else { if (stopLoss > 0 && stopLoss <= openPrice) { showModal('Invalid SL/TP', 'For a SELL order, Stop Loss must be above the open price.'); return; } if (takeProfit > 0 && takeProfit >= openPrice) { showModal('Invalid SL/TP', 'For a SELL order, Take Profit must be below the open price.'); return; } } const tradeData = { id: Date.now().toString(), symbol, type, volume, openPrice, stopLoss, takeProfit, openTime: new Date().toJSON() }; tradeData.priceLine = drawEntryLine(tradeData); openPositions.push(tradeData); renderOpenPositions(); showModal('Success', `${type} order for ${volume} lot(s) of ${symbol} has been placed.`); stopLossInput.value = ''; takeProfitInput.value = ''; saveState(); }
+            function redrawAllEntryLines() { openPositions.forEach(pos => { if (pos.priceLine && mainSeries) { try { mainSeries.removePriceLine(pos.priceLine); } catch (e) { /* Fails silently if line is already gone */ } pos.priceLine = null; } }); const currentSymbol = instrumentSelect.value; openPositions.forEach(pos => { if (pos.symbol === currentSymbol) { pos.priceLine = drawEntryLine(pos); } }); }
+            function openTrade(type) { const symbol = instrumentSelect.value; const volume = parseFloat(lotSizeInput.value); const stopLoss = parseFloat(stopLossInput.value) || 0; const takeProfit = parseFloat(takeProfitInput.value) || 0; if (isNaN(volume) || volume <= 0) { showModal('Invalid Input', 'Please enter a valid lot size.'); return; } const openPrice = type === 'BUY' ? marketData[symbol].ask : marketData[symbol].bid; const requiredMargin = (CONTRACT_SIZES[symbol] * volume * openPrice) / LEVERAGE; const marginUsed = openPositions.reduce((sum, pos) => sum + (CONTRACT_SIZES[pos.symbol] * pos.volume * pos.openPrice) / LEVERAGE, 0); const freeMargin = accountInfo.equity - marginUsed; if (requiredMargin > freeMargin) { showModal('Order Rejected', 'Not enough free margin to open this position.'); return; } if (type === 'BUY') { if (stopLoss > 0 && stopLoss >= openPrice) { showModal('Invalid SL/TP', 'For a BUY order, Stop Loss must be below the open price.'); return; } if (takeProfit > 0 && takeProfit <= openPrice) { showModal('Invalid SL/TP', 'For a BUY order, Take Profit must be above the open price.'); return; } } else { if (stopLoss > 0 && stopLoss <= openPrice) { showModal('Invalid SL/TP', 'For a SELL order, Stop Loss must be above the open price.'); return; } if (takeProfit > 0 && takeProfit >= openPrice) { showModal('Invalid SL/TP', 'For a SELL order, Take Profit must be below the open price.'); return; } } const tradeData = { id: Date.now().toString(), symbol, type, volume, openPrice, stopLoss, takeProfit, openTime: new Date().toJSON() }; if (tradeData.symbol === instrumentSelect.value) { tradeData.priceLine = drawEntryLine(tradeData); } openPositions.push(tradeData); renderOpenPositions(); showModal('Success', `${type} order for ${volume} lot(s) of ${symbol} has been placed.`); stopLossInput.value = ''; takeProfitInput.value = ''; saveState(); }
             function closePosition(positionId, customClosePrice = null) { const posIndex = openPositions.findIndex(p => p.id === positionId); if (posIndex === -1) return; const pos = openPositions[posIndex]; if (pos.priceLine) { mainSeries.removePriceLine(pos.priceLine); } const closePrice = customClosePrice !== null ? customClosePrice : (pos.type === 'BUY' ? marketData[pos.symbol].bid : marketData[pos.symbol].ask); const priceDiff = pos.type === 'BUY' ? (closePrice - pos.openPrice) : (pos.openPrice - closePrice); const pointValue = CONTRACT_SIZES[pos.symbol]; const profit = priceDiff * pos.volume * pointValue; const historyData = { ...pos, closePrice, closeTime: new Date().toJSON(), profit }; delete historyData.priceLine; history.push(historyData); openPositions.splice(posIndex, 1); accountInfo.balance += profit; renderOpenPositions(); renderHistory(); const reason = customClosePrice !== null ? (customClosePrice === pos.takeProfit ? 'Take Profit' : 'Stop Loss') : 'Manual Close'; showModal(`Position Closed (${reason})`, `Position for ${pos.symbol} closed with a profit of ${formatCurrency(profit)}.`); saveState(); }
             buyButton.addEventListener('click', () => openTrade('BUY'));
             sellButton.addEventListener('click', () => openTrade('SELL'));
@@ -335,45 +338,15 @@
             tabHistory.addEventListener('click', () => { historyContent.classList.remove('hidden'); positionsContent.classList.add('hidden'); tabHistory.classList.add('border-blue-500', 'text-white'); tabHistory.classList.remove('text-gray-400'); tabPositions.classList.remove('border-blue-500', 'text-white'); tabPositions.classList.add('text-gray-400'); });
             
             // --- App Initialization ---
-            function initializeApp() {
-                loadState();
-                
-                if (!fullMarketHistory || Object.keys(fullMarketHistory).length === 0) {
-                    preGenerateFullHistory();
-                    saveState();
-                }
-
-                // This must be run after history is available
-                Object.keys(marketData).forEach(symbol => {
-                    const initialPrice = fullMarketHistory[symbol][149].close;
-                    marketData[symbol].bid = initialPrice;
-                    marketData[symbol].ask = initialPrice + (symbol.includes('JPY') ? 0.01 : 0.0001) * 2;
-                });
-                
-                renderOpenPositions();
-                renderHistory();
-
-                appContent.classList.remove('hidden');
-                loadingOverlay.classList.add('hidden');
-
-                requestAnimationFrame(() => {
-                    try {
-                        initChart();
-                        loadChartData(instrumentSelect.value, currentInterval);
-                        if (marketIntervalId) clearInterval(marketIntervalId);
-                        marketIntervalId = setInterval(simulateMarket, 1500);
-                    } catch (e) {
-                        console.error("Initialization failed:", e);
-                        chartContainer.innerHTML = `<div class="p-4 text-red-400 text-center">Error: Could not load chart.</div>`;
-                    }
-                });
-            }
+            function initializeApp() { /* ... unchanged ... */ }
             
-            // --- Re-pasting unchanged functions for brevity ---
+            // --- Re-pasting all functions with saveState() calls and minor fixes ---
             function renderMarketWatch() { marketWatchList.innerHTML = ''; for (const symbol in marketData) { const data = marketData[symbol]; const priceChangeClass = data.bid > data.lastBid ? 'price-up' : (data.bid < data.lastBid ? 'price-down' : ''); const pipsMultiplier = symbol.includes('JPY') ? 100 : 10000; const spread = (data.ask - data.bid) * pipsMultiplier; const element = document.createElement('div'); element.className = 'p-2 rounded-md bg-gray-700/50 flex justify-between items-center cursor-pointer hover:bg-gray-600/50'; element.innerHTML = `<div><div class="font-bold">${symbol}</div><div class="text-xs text-gray-400">Spread: ${spread.toFixed(1)}</div></div><div class="text-right font-mono ${priceChangeClass}"><div>${data.bid.toFixed(symbol === 'XAUUSD' || symbol === 'USDJPY' ? 2 : 4)}</div></div>`; element.addEventListener('click', () => { instrumentSelect.value = symbol; instrumentSelect.dispatchEvent(new Event('change')); }); marketWatchList.appendChild(element); } }
+            function renderAccountInfo(totalPL) { accountInfo.equity = (accountInfo.balance || 0) + totalPL; balanceValueEl.textContent = formatCurrency(accountInfo.balance); equityValueEl.textContent = formatCurrency(accountInfo.equity); plValueEl.textContent = formatCurrency(totalPL); plValueEl.className = `font-mono font-semibold ${totalPL >= 0 ? 'price-up' : 'price-down'}`; const marginUsed = openPositions.reduce((sum, pos) => sum + (CONTRACT_SIZES[pos.symbol] * pos.volume * pos.openPrice) / LEVERAGE, 0); const freeMargin = accountInfo.equity - marginUsed; const marginLevel = marginUsed > 0 ? (accountInfo.equity / marginUsed) * 100 : 0; marginValueEl.textContent = formatCurrency(marginUsed); freeMarginValueEl.textContent = formatCurrency(freeMargin); marginLevelValueEl.textContent = `${marginLevel.toFixed(2)}%`; }
             function renderOpenPositions() { openPositionsBody.innerHTML = ''; let totalPL = 0; if (openPositions.length === 0) { openPositionsBody.innerHTML = `<tr><td colspan="9" class="text-center p-4 text-gray-500">No open positions.</td></tr>`; renderAccountInfo(0); return; } openPositions.forEach(pos => { const currentPrice = pos.type === 'BUY' ? marketData[pos.symbol].bid : marketData[pos.symbol].ask; const priceDiff = pos.type === 'BUY' ? (currentPrice - pos.openPrice) : (pos.openPrice - currentPrice); const pointValue = CONTRACT_SIZES[pos.symbol]; const profit = priceDiff * pos.volume * pointValue; totalPL += profit; const profitClass = profit >= 0 ? 'price-up' : 'price-down'; const slText = pos.stopLoss > 0 ? formatPrice(pos.stopLoss, pos.symbol) : '-'; const tpText = pos.takeProfit > 0 ? formatPrice(pos.takeProfit, pos.symbol) : '-'; const row = document.createElement('tr'); row.className = 'hover:bg-gray-700/50'; row.innerHTML = `<td class="p-2 font-semibold">${pos.symbol}</td><td class="p-2 font-semibold ${pos.type === 'BUY' ? 'text-green-500' : 'text-red-500'}">${pos.type}</td><td class="p-2">${pos.volume}</td><td class="p-2 font-mono">${formatPrice(pos.openPrice, pos.symbol)}</td><td class="p-2 font-mono text-red-400">${slText}</td><td class="p-2 font-mono text-green-400">${tpText}</td><td class="p-2 font-mono">${formatPrice(currentPrice, pos.symbol)}</td><td class="p-2 font-mono font-semibold ${profitClass}">${formatCurrency(profit)}</td><td class="p-2"><button data-id="${pos.id}" class="close-btn text-xs bg-gray-600 hover:bg-red-600 px-2 py-1 rounded">Close</button></td>`; openPositionsBody.appendChild(row); }); positionsCountEl.textContent = openPositions.length; renderAccountInfo(totalPL); }
             function renderHistory() { historyBody.innerHTML = ''; if (history.length === 0) { historyBody.innerHTML = `<tr><td colspan="6" class="text-center p-4 text-gray-500">No trading history.</td></tr>`; } history.sort((a, b) => new Date(b.closeTime) - new Date(a.closeTime)); history.forEach(trade => { const profitClass = trade.profit >= 0 ? 'price-up' : 'price-down'; const row = document.createElement('tr'); row.innerHTML = `<td class="p-2 font-semibold">${trade.symbol}</td><td class="p-2 font-semibold ${trade.type === 'BUY' ? 'text-green-500' : 'text-red-500'}">${trade.type}</td><td class="p-2">${trade.volume}</td><td class="p-2 font-mono">${(trade.openPrice || 0).toFixed(trade.symbol.includes('JPY') ? 2 : 4)}</td><td class="p-2 font-mono">${(trade.closePrice || 0).toFixed(trade.symbol.includes('JPY') ? 2 : 4)}</td><td class="p-2 font-mono font-semibold ${profitClass}">${formatCurrency(trade.profit)}</td>`; historyBody.appendChild(row); }); }
             function checkSLTP() { const positionsToClose = []; for (const pos of openPositions) { const bid = marketData[pos.symbol].bid; const ask = marketData[pos.symbol].ask; if (pos.stopLoss > 0) { if (pos.type === 'BUY' && bid <= pos.stopLoss) { positionsToClose.push({ id: pos.id, closePrice: pos.stopLoss }); } else if (pos.type === 'SELL' && ask >= pos.stopLoss) { positionsToClose.push({ id: pos.id, closePrice: pos.stopLoss }); } } if (pos.takeProfit > 0) { if (pos.type === 'BUY' && bid >= pos.takeProfit) { positionsToClose.push({ id: pos.id, closePrice: pos.takeProfit }); } else if (pos.type === 'SELL' && ask <= pos.takeProfit) { positionsToClose.push({ id: pos.id, closePrice: pos.takeProfit }); } } } positionsToClose.forEach(p => closePosition(p.id, p.closePrice)); }
+            function initializeApp() { loadState(); if (!fullMarketHistory || Object.keys(fullMarketHistory).length === 0) { preGenerateFullHistory(); saveState(); } Object.keys(marketData).forEach(symbol => { const historyForSymbol = fullMarketHistory[symbol]; if(historyForSymbol && historyForSymbol.length > 149) { const initialPrice = historyForSymbol[149].close; marketData[symbol].bid = initialPrice; marketData[symbol].ask = initialPrice + (symbol.includes('JPY') ? 0.01 : 0.0001) * 2; } }); renderOpenPositions(); renderHistory(); appContent.classList.remove('hidden'); loadingOverlay.classList.add('hidden'); requestAnimationFrame(() => { try { initChart(); loadChartData(instrumentSelect.value, currentInterval); if (marketIntervalId) clearInterval(marketIntervalId); marketIntervalId = setInterval(simulateMarket, 1500); } catch (e) { console.error("Initialization failed:", e); chartContainer.innerHTML = `<div class="p-4 text-red-400 text-center">Error: Could not load chart.</div>`; } }); }
             
             initializeApp();
         });
